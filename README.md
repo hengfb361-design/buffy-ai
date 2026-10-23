@@ -62,10 +62,22 @@ Website/`local_app.py` អាចប្រើ backend ពីរ — **key អា�
 | `API_MODEL` | model id សម្រាប់ API នោះ | Sites → Secrets ឬ env |
 | `LLAMA_URL` | engine local (Ollama / llama.cpp) — ប្រើពេល `API_BASE_URL` ទទេ | env |
 | `LOCAL_MODEL` | model id នៅក្នុង engine local | env |
+| `EXA_API_KEY` | **web search** សម្រាប់បង្ហាញប្រភព (Exa) — គ្មាន key = search បិទ | Sites → Secrets / Colab 🔑 Secrets |
 
 - **មិនកំណត់** `API_BASE_URL` → ប្រើ engine local (`LLAMA_URL`) ដូចមុន
 - **កំណត់** `API_BASE_URL` → ប្រើ API ពិត, `API_KEY` បញ្ជូនជា `Authorization: Bearer …` (តែនៅ server)
-- `/api/health` រាយ `key_set: true/false` តែ **មិនបញ្ចេញតម្លៃ key** ទេ
+- `/api/health` រាយ `key_set: true/false` និង `web_search: "exa"|"off"` តែ **មិនបញ្ចេញតម្លៃ key** ទេ
+
+### Web search (បង្ហាញប្រភព)
+
+បើក toggle **🌐 ស្វែងរកអ៊ីនធឺណិត** ក្នុង sidebar → server ស្វែងរក ហើយ៖
+- បង្ហាញ **chips ប្រភព** ចុចបានក្រោមចម្លើយ
+- បញ្ចូលលទ្ធផល ៥ ដំបូង (title + URL + snippet) ក្នុង context ដើម្បីឲ្យម៉ូដែលដកស្រង់
+- គ្មាន `EXA_API_KEY` → ប្រាប់ជាសារ រួចឆ្លើយធម្មតាបន្ត (មិន crash)
+- គ្មាន `"type": "auto"`, គ្មានការបរាជ័យ → បញ្ជូន HTTP status ជាសារ
+
+> Search API ឥតគិតថ្លៃ៖ Exa (≈2,800 searches ដំបូង + $10/ខែ គ្មានកាត)។ ទោះជាយ៉ាងណា កូដនេះក៏ទទួល
+> endpoint ណាមួយដែលគាំទ្រ `POST …/search` + `Authorization: Bearer` បានដែរ។
 
 > ⛔ កុំដាក់ key ក្នុងកូដ, `.env` ដែល commit, URL ឬ input box ក្នុង browser។
 > បើ key ធ្លាយ (ឧ. paste ក្នុង chat) → revoke/regenerate ភ្លាម។

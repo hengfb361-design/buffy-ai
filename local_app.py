@@ -28,6 +28,7 @@ the server, so the public page never receives it.
 import json
 import os
 import traceback
+from urllib.parse import quote_plus
 
 import requests
 from fastapi import FastAPI
@@ -46,6 +47,13 @@ API_BASE_URL = os.environ.get("API_BASE_URL", "").rstrip("/")
 API_KEY = os.environ.get("API_KEY", "").strip()
 API_MODEL = os.environ.get("API_MODEL", "").strip()
 
+# Optional web search for source citations (Exa). Read from the server
+# environment only — the browser never receives it.
+EXA_API_KEY = os.environ.get("EXA_API_KEY", "").strip()
+# Overridable so the endpoint can be pointed at a mock in tests.
+EXA_SEARCH_URL = os.environ.get("EXA_SEARCH_URL", "https://api.exa.ai/search")
+SEARCH_TOP_N = 5
+
 
 def backend():
     """(base_url, model, headers) for the engine that is currently configured."""
@@ -59,6 +67,62 @@ def backend():
 
 def mode() -> str:
     return "hosted API" if API_BASE_URL else "local"
+
+
+def search_web(query: str):
+    """Return (sources, notes).
+
+    sources is a list of {title, url} for the UI's citation chips;
+    notes is a short human-readable status line. Never raises.
+    """
+    if not EXA_API_KEY:
+        return [], ("Web search ត្រូវការ EXA_API_KEY — ដាក់ក្នុង Sites → Secrets សិន។")
+    try:
+        resp = requests.post(
+            EXA_SEARCH_URL,
+            headers={
+                "Authorization": "Bearer " + EXA_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json={
+                "query": query,
+                "type": "auto",
+                "numResults": SEARCH_TOP_N,
+                "contents": {"highlights": True},
+            },
+            timeout=(5, 20),
+        )
+        if resp.status_code != 200:
+            return [], ("Web search បរាជ័យ (HTTP %s)" % resp.status_code)
+        results = resp.json().get("results") or []
+        sources, notes = [], []
+        for item in results[:SEARCH_TOP_N]:
+            title = (item.get("title") or "").strip()
+            url = (item.get("url") or "").strip()
+            if not url:
+                continue
+            sources.append({"title": title or url, "url": url})
+            highlights = item.get("highlights") or []
+            snippet = (highlights[0] if highlights else "").strip()
+            notes.append("%s\n  URL: %s\n  %s" % (title, url, snippet[:400]))
+        return sources, notes
+    except Exception as exc:  # noqa: BLE001
+        traceback.print_exc()
+        return [], ("Web search មិនអាចភ្ជាប់បានទេ: %s" % str(exc)[:120])
+
+
+def with_web_context(message: str, notes) -> str:
+    """Prepend search results so the model can cite them."""
+    if not notes:
+        return message
+    block = "\n\n".join(notes)
+    return (
+        "[Web search results — use them only when relevant, and cite the source "
+        "by name and link. Ignore them if they do not answer the question.]\n\n"
+        + block
+        + "\n\n---\n\nQuestion:\n"
+        + message
+    )
 
 SYSTEM_INSTRUCTION = (
     "You are a helpful AI assistant running locally on the user's machine. "
@@ -93,7 +157,7 @@ def sse(obj: dict) -> str:
     return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
 
 
-def build_messages(req: ChatRequest) -> List[dict]:
+def build_messages(req: ChatRequest, user_text: str = "") -> List[dict]:
     messages = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
     for turn in req.history[-16:]:
         text = (turn.text or "").strip()
@@ -101,7 +165,7 @@ def build_messages(req: ChatRequest) -> List[dict]:
             continue
         role = "user" if turn.role == "user" else "assistant"
         messages.append({"role": role, "content": text[:6000]})
-    messages.append({"role": "user", "content": req.message.strip() or "(empty message)"})
+    messages.append({"role": "user", "content": user_text or req.message.strip() or "(empty message)"})
     return messages
 
 
@@ -124,9 +188,22 @@ def chat_stream(req: ChatRequest):
 
         base_url, model_name, headers = backend()
         yield sse({"type": "status", "text": "កំពុងគិត (%s)…" % mode()})
+
+        user_text = req.message.strip()
+        if req.web_search:
+            yield sse({"type": "status", "text": "កំពុងស្វែងរកអ៊ីនធឺណិត…"})
+            sources, notes = search_web(req.message.strip() or "What is this about?")
+            if sources:
+                yield sse({"type": "sources", "sources": sources})
+            elif notes:
+                yield sse({"type": "status", "text": notes})
+            if isinstance(notes, list) and notes:
+                user_text = with_web_context(user_text, notes)
+            yield sse({"type": "status", "text": "កំពុងគិត (%s)…" % mode()})
+
         payload = {
             "model": model_name,
-            "messages": build_messages(req),
+            "messages": build_messages(req, user_text),
             "stream": True,
             "max_tokens": 2048,
         }
@@ -219,6 +296,7 @@ def health():
         "engine": base_url,
         "model": model_name,
         "key_set": bool(API_KEY),
+        "web_search": "exa" if EXA_API_KEY else "off",
     }
 
 
