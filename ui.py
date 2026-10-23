@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Shared single-page chat UI (ChatGPT-style) used by app.py and local_app.py.
+"""Shared single-page chat UI (ChatGPT-style) served by local_app.py.
 
 It is plain HTML/CSS/JS with no build step: Markdown rendering, code blocks with
 copy buttons, image attachments, source chips, chat export and local history.
@@ -225,9 +225,7 @@ PAGE = r"""<!doctype html>
     <div class="field">
       <label for="model">ម៉ូដែល</label>
       <select id="model">
-        <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash · ឆ្លាតបំផុត</option>
-        <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
-        <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite · លឿន</option>
+        <option value="local" selected>Qwen · local (ក្នុង Colab)</option>
       </select>
     </div>
     <label class="toggle" for="webSearch">
@@ -247,7 +245,7 @@ PAGE = r"""<!doctype html>
     </div>
 
     <div class="side-foot">
-      ប្រើប្រាស់ Gemini API · ប្រវត្តិរក្សាទុកក្នុងកម្មវិធីរុករករបស់អ្នក
+      ម៉ូដែល local · គ្មាន API key · ប្រវត្តិរក្សាទុកក្នុង browser
     </div>
   </aside>
   <div class="scrim" id="scrim"></div>

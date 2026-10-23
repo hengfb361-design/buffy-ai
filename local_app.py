@@ -81,15 +81,14 @@ def chat_stream(req: ChatRequest):
             yield sse(
                 {
                     "type": "error",
-                    "text": "ម៉ូដែល local នេះជា text-only — មិនអាចអានរូបភាពបានទេ។ "
-                    "សូមប្រើកំណែ Gemini សម្រាប់រូបភាព។",
+                    "text": "ម៉ូដែល local នេះជា text-only — មិនអាចអានរូបភាពបានទេ។",
                 }
             )
         if req.image_mode:
             yield sse(
                 {
                     "type": "error",
-                    "text": "ការបង្កើតរូបភាពត្រូវការ Gemini (Nano Banana) មិនមែនម៉ូដែល local ទេ។",
+                    "text": "ម៉ូដែល local នេះមិនអាចបង្កើតរូបភាពបានទេ។",
                 }
             )
 

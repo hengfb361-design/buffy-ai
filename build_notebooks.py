@@ -1,22 +1,33 @@
 # -*- coding: utf-8 -*-
-"""Regenerate the two Colab notebooks from the source files."""
+"""Regenerate the Qwen Colab notebook from the source files.
+
+Usage: python build_notebooks.py
+"""
 
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 UI = (ROOT / "ui.py").read_text(encoding="utf-8")
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 LOCAL_APP = (ROOT / "local_app.py").read_text(encoding="utf-8")
 
-for src in (UI, APP, LOCAL_APP):
+for src in (UI, LOCAL_APP):
     assert src.endswith("\n")
 
-# --------------------------------------------------------------------------- #
-# Shared pieces
-# --------------------------------------------------------------------------- #
 CLOUDFLARED = """!wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O /usr/local/bin/cloudflared
 !chmod +x /usr/local/bin/cloudflared"""
+
+WAIT_SERVER = '''ready = False
+for _ in range(80):
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/health", timeout=2) as r:
+            print("✅ Server ដំណើរការ:", r.read().decode()[:160])
+            ready = True
+            break
+    except Exception:
+        time.sleep(0.5)
+if not ready:
+    raise RuntimeError("Server មិនអាចចាប់ផ្តើមបានទេ — សូមមើល log ខាងលើ")'''
 
 RUN_TAIL = """proc = subprocess.Popen(
     ["cloudflared", "tunnel", "--url", f"http://127.0.0.1:{PORT}", "--no-autoupdate"],
@@ -41,18 +52,6 @@ for line in proc.stdout:
 
 print("\\n🔌 Tunnel បានបិទ។ ប្រសិនបើអ្នកចង់បាន link ថ្មី សូមរត់ cell នេះម្តងទៀត។")"""
 
-WAIT_SERVER = '''ready = False
-for _ in range(80):
-    try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/health", timeout=2) as r:
-            print("✅ Server ដំណើរការ:", r.read().decode()[:160])
-            ready = True
-            break
-    except Exception:
-        time.sleep(0.5)
-if not ready:
-    raise RuntimeError("Server មិនអាចចាប់ផ្តើមបានទេ — សូមមើល log ខាងលើ")'''
-
 
 def code(src):
     return {
@@ -72,118 +71,11 @@ def md(src):
     }
 
 
-def notebook(cells, name):
-    for i, c in enumerate(cells):
-        c["metadata"]["id"] = f"cell{i}"
-    nb = {
-        "nbformat": 4,
-        "nbformat_minor": 0,
-        "metadata": {
-            "colab": {"provenance": [], "toc_visible": True},
-            "kernelspec": {"display_name": "Python 3", "name": "python3"},
-            "language_info": {"name": "python"},
-        },
-        "cells": cells,
-    }
-    out = ROOT / name
-    out.write_text(json.dumps(nb, ensure_ascii=False, indent=1), encoding="utf-8")
-    print("wrote", name, len(cells), "cells,", out.stat().st_size, "bytes")
-
-
-# --------------------------------------------------------------------------- #
-# Notebook 1 — Gemini (cloud API)
-# --------------------------------------------------------------------------- #
-GEMINI_INTRO = """# ✦ Buffy AI — Chatbot ស្ទីល GPT នៅលើ Google Colab
-
-កម្មវិធីជជែក AI ដែល៖
-- 💬 ឆ្លើយសំណួរបានគ្រប់យ៉ាង ជាភាសាខ្មែរ ឬភាសាណាមួយ
-- 🌐 ស្វែងរកអ៊ីនធឺណិត (Google Search) ដូច ChatGPT ព្រមទាំងបង្ហាញប្រភព
-- 🖼️ ផ្ញើរូបភាពឱ្យ AI មើល និងវិភាគ
-- 🎨 បង្កើត / កែរូបភាពដោយ AI (Nano Banana)
-- 🔗 បង្កើត **link សាធារណៈ** សម្រាប់ជជែកពីទូរស័ព្ទ ឬកុំព្យូទ័រណាមួយ
-
----
-
-## ជំហានទី 1 — យក API key ឥតគិតថ្លៃ
-1. បើក 👉 https://aistudio.google.com/apikey
-2. ចូលដោយគណនី Google រួចចុច **Create API key**
-3. ចម្លង key (វាមានទម្រង់បែប `AIza...`)
-
-## ជំហានទី 2 — រត់ cell ទី 1 និងទី 2
-- Cell **1️⃣ ដំឡើង** — ដំឡើងបណ្ណាល័យ (រត់ម្តងប៉ុណ្ណោះ)
-- Cell **2️⃣ ដាក់ API key** — paste key របស់អ្នក (លាក់មិនបង្ហាញ)
-
-> គន្លឹះ៖ បើអ្នកមិនចង់ paste រាល់ដងទេ សូមដាក់ key ក្នុង 🔑 (Secrets) ខាងឆ្វេងដៃ ជាឈ្មោះ `GEMINI_API_KEY` ហើយបើក “Notebook access”។
-
-## ជំហានទី 3 — រត់ cell ចុងក្រោយ
-វានឹងបង្ហាញ **link** បែប `https://xxxx.trycloudflare.com` — ចម្លងទៅបើកក្នុង browser ហើយចាប់ផ្តើមជជែកបាន។
-
-⏳ Link នេះដំណើរការដរាបណា cell ចុងក្រោយនៅរត់ (Colab បិទពេលអ្នកបិទ tab យូរ ឬអស់ម៉ោង)។
-🔒 កុំចែករំលែក link ជាសាធារណៈ — អ្នកណាមាន link អាចប្រើ quota API key របស់អ្នកបាន។"""
-
-GEMINI_INSTALL = """#@title 1️⃣ ដំឡើងបណ្ណាល័យ (រត់ម្តងប៉ុណ្ណោះ)
-%pip install -q --upgrade fastapi uvicorn google-genai
-
-""" + CLOUDFLARED + """
-!cloudflared --version"""
-
-GEMINI_KEY = """#@title 2️⃣ ដាក់ API key របស់អ្នក
-import os
-
-key = ""
-try:  # ព្យាយាមអានពី Colab Secrets (🔑) មុន
-    from google.colab import userdata
-    key = userdata.get("GEMINI_API_KEY") or ""
-except Exception:
-    key = ""
-
-if not key:
-    from getpass import getpass
-    key = getpass("Paste your Gemini API key (https://aistudio.google.com/apikey): ").strip()
-
-os.environ["GEMINI_API_KEY"] = key
-print("✅ ដាក់ API key រួចរាល់" if key else "❌ មិនមាន key — សូមរត់ cell នេះម្តងទៀត")"""
-
-GEMINI_RUN = """#@title 3️⃣ បើក server + យក link សាធារណៈ
-import re, subprocess, threading, time, urllib.request
-
-import uvicorn
-
-PORT = 8000
-
-threading.Thread(
-    target=uvicorn.run,
-    args=("app:app",),
-    kwargs=dict(host="127.0.0.1", port=PORT, log_level="warning"),
-    daemon=True,
-).start()
-
-""" + WAIT_SERVER + """
-
-print("🌐 កំពុងបើក tunnel… (រង់ចាំ 5-15 វិនាទី)\\n")
-
-""" + RUN_TAIL
-
-notebook(
-    [
-        md(GEMINI_INTRO),
-        code(GEMINI_INSTALL),
-        code("%%writefile ui.py\n" + UI),
-        code("%%writefile app.py\n" + APP),
-        code(GEMINI_KEY),
-        code(GEMINI_RUN),
-    ],
-    "Buffy_AI_Colab.ipynb",
-)
-
-# --------------------------------------------------------------------------- #
-# Notebook 2 — local Qwen via Ollama
-# --------------------------------------------------------------------------- #
-QWEN_INTRO = """# 🤖 Qwen Code — ម៉ូដែល open-source ដំណើរការក្នុង Colab (ឥតគិតថ្លៃ)
+INTRO = """# 🤖 Qwen Code — ម៉ូដែល AI ដំណើរការក្នុង Google Colab (ឥតគិតថ្លៃ)
 
 Notebook នេះទាញយក **GGUF** ពី Hugging Face រួចរត់វាក្នុង Colab តាម **Ollama**
-(OpenAI-compatible API) ហើយបើក **UI ស្ទីល GPT** ដូច notebook មុន ជាមួយ link សាធារណៈ។
-**មិនត្រូវការ API key** — ម៉ូដែលរត់លើ GPU របស់ Colab ផ្ទាល់។
+(OpenAI-compatible API) ហើយបើក **UI ស្ទីល GPT** ជាមួយ link សាធារណៈ។
+**គ្មាន API key, គ្មាន Gemini, គ្មានការចំណាយ** — ម៉ូដែលរត់លើ GPU របស់ Colab ផ្ទាល់។
 
 ---
 
@@ -206,13 +98,13 @@ Notebook នេះទាញយក **GGUF** ពី Hugging Face រួចរត�
 
 ## អ្វីដែលបាន / មិនបាន
 ✅ ជជែក + សរសេរកូដ, គ្មាន API key, ទិន្នន័យមិនចេញក្រៅ, UI ស្អាត, link សាធារណៈ
-❌ មិនអានរូបភាព, គ្មាន web search, គ្មានបង្កើតរូបភាព (សម្រាប់របស់ទាំងនោះ សូមប្រើ notebook Gemini)
+❌ មិនអានរូបភាព, គ្មាន web search, គ្មានបង្កើតរូបភាព (ម៉ូដែល local ជា text-only)
 
 > 🔐 ម៉ូដែល open-source មានគោលការណ៍សុវត្ថិភាពរបស់វាដោយខ្លួនឯង។ Notebook នេះ **មិន**កំណត់
 > ឬ jailbreak ដើម្បីបំបែកគោលការណ៍ទាំងនោះទេ — សម្រាប់ការរៀនសុវត្ថិភាពសូមប្រើ lab
 > ស្របច្បាប់ (TryHackMe, HackTheBox, DVWA) និងប្រព័ន្ធដែលអ្នកមានសិទ្ធិសាកល្បង។"""
 
-QWEN_INSTALL = """#@title 1️⃣ ដំឡើង Ollama + cloudflared
+INSTALL = """#@title 1️⃣ ដំឡើង Ollama + cloudflared
 # Ollama = engine សម្រាប់រត់ GGUF ក្នុងម៉ាស៊ីន ជាមួយ OpenAI-compatible API
 !curl -fsSL https://ollama.com/install.sh | sh
 !ollama --version
@@ -247,7 +139,7 @@ gpu = subprocess.run(
 ).stdout.strip()
 print(gpu or "⚠️ គ្មាន GPU — សូមបើក Runtime → Change runtime type → T4 GPU")"""
 
-QWEN_MODEL = '''#@title 2️⃣ ទាញយកម៉ូដែល + import ចូល Ollama
+MODEL_CELL = '''#@title 2️⃣ ទាញយកម៉ូដែល + import ចូល Ollama
 #@markdown ជ្រើសម៉ូដែល (សូមមើលតារាងខាងលើ):
 MODEL_CHOICE = "coder30b"  #@param ["coder30b", "qwen38_27b", "coder7b"]
 
@@ -314,7 +206,7 @@ r = subprocess.run(["ollama", "create", "buffy-coder", "-f", "/content/Modelfile
 print(r.stdout[-2000:] or r.stderr[-2000:])
 print("✅ ម៉ូដែលរួចរាល់" if r.returncode == 0 else "❌ import មិនបាន — សូមមើលសារខាងលើ")'''
 
-QWEN_RUN = '''#@title 3️⃣ បើក UI + link សាធារណៈ
+RUN = '''#@title 3️⃣ បើក UI + link សាធារណៈ
 import os, re, subprocess, sys, time, urllib.request
 
 PORT = 8000
@@ -349,14 +241,28 @@ print("🌐 កំពុងបើក tunnel… (រង់ចាំ 5-15 វិ�
 
 ''' + RUN_TAIL
 
-notebook(
-    [
-        md(QWEN_INTRO),
-        code(QWEN_INSTALL),
-        code(QWEN_MODEL),
-        code("%%writefile ui.py\n" + UI),
-        code("%%writefile local_app.py\n" + LOCAL_APP),
-        code(QWEN_RUN),
-    ],
-    "Qwen_Code_Colab.ipynb",
-)
+cells = [
+    md(INTRO),
+    code(INSTALL),
+    code(MODEL_CELL),
+    code("%%writefile ui.py\n" + UI),
+    code("%%writefile local_app.py\n" + LOCAL_APP),
+    code(RUN),
+]
+for i, c in enumerate(cells):
+    c["metadata"]["id"] = f"cell{i}"
+
+nb = {
+    "nbformat": 4,
+    "nbformat_minor": 0,
+    "metadata": {
+        "colab": {"provenance": [], "toc_visible": True},
+        "kernelspec": {"display_name": "Python 3", "name": "python3"},
+        "language_info": {"name": "python"},
+    },
+    "cells": cells,
+}
+
+out = ROOT / "Qwen_Code_Colab.ipynb"
+out.write_text(json.dumps(nb, ensure_ascii=False, indent=1), encoding="utf-8")
+print("wrote", out.name, len(cells), "cells,", out.stat().st_size, "bytes")

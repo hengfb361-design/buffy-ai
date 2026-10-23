@@ -16,3 +16,6 @@ content/
 .env
 .env.*
 *.log
+
+# build artifacts
+*.zip
