@@ -51,6 +51,25 @@ LLAMA_URL=http://127.0.0.1:11434 LOCAL_MODEL=buffy-coder \
   uvicorn local_app:app --host 127.0.0.1 --port 8000
 ```
 
+## ការតភ្ជាប់ API key (server-side)
+
+Website/`local_app.py` អាចប្រើ backend ពីរ — **key អានតែនៅ server, មិនដែលឆ្លងកាត់ browser**៖
+
+| Env var | តួនាទី | ដាក់នៅឯណា |
+|---|---|---|
+| `API_BASE_URL` | base URL របស់ API ពិត (OpenAI-compatible) ឧ. `https://api.example.com/v1` | Sites → Secrets ឬ env |
+| `API_KEY` | bearer key សម្រាប់ API នោះ | **Sites → Secrets** (ឬ Colab 🔑 Secrets) |
+| `API_MODEL` | model id សម្រាប់ API នោះ | Sites → Secrets ឬ env |
+| `LLAMA_URL` | engine local (Ollama / llama.cpp) — ប្រើពេល `API_BASE_URL` ទទេ | env |
+| `LOCAL_MODEL` | model id នៅក្នុង engine local | env |
+
+- **មិនកំណត់** `API_BASE_URL` → ប្រើ engine local (`LLAMA_URL`) ដូចមុន
+- **កំណត់** `API_BASE_URL` → ប្រើ API ពិត, `API_KEY` បញ្ជូនជា `Authorization: Bearer …` (តែនៅ server)
+- `/api/health` រាយ `key_set: true/false` តែ **មិនបញ្ចេញតម្លៃ key** ទេ
+
+> ⛔ កុំដាក់ key ក្នុងកូដ, `.env` ដែល commit, URL ឬ input box ក្នុង browser។
+> បើ key ធ្លាយ (ឧ. paste ក្នុង chat) → revoke/regenerate ភ្លាម។
+
 ## Push ទៅ GitHub
 
 ```bash

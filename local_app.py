@@ -14,6 +14,15 @@ The Colab notebook starts the engine, imports the GGUF, then runs this app:
 Environment:
     LLAMA_URL    OpenAI-compatible base URL (default http://127.0.0.1:11434)
     LOCAL_MODEL  model name inside that engine (default "buffy-coder")
+
+    API_BASE_URL OpenAI-compatible *hosted* API, e.g. https://api.example.com/v1
+    API_KEY      bearer key for that API — set it in Sites → Secrets / env,
+                 never in the browser or the source code
+    API_MODEL    model id for that API (falls back to LOCAL_MODEL)
+
+When API_BASE_URL is set the app calls that hosted API; otherwise it uses the
+local engine at LLAMA_URL. The key is only ever read from the environment on
+the server, so the public page never receives it.
 """
 
 import json
@@ -30,6 +39,27 @@ from ui import PAGE
 
 LLAMA_URL = os.environ.get("LLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 LOCAL_MODEL = os.environ.get("LOCAL_MODEL", "buffy-coder")
+
+# Optional hosted OpenAI-compatible API. The key lives only in the server
+# environment (Sites → Secrets / process env) and is never sent to the browser.
+API_BASE_URL = os.environ.get("API_BASE_URL", "").rstrip("/")
+API_KEY = os.environ.get("API_KEY", "").strip()
+API_MODEL = os.environ.get("API_MODEL", "").strip()
+
+
+def backend():
+    """(base_url, model, headers) for the engine that is currently configured."""
+    if API_BASE_URL:
+        headers = {"Content-Type": "application/json"}
+        if API_KEY:
+            headers["Authorization"] = "Bearer " + API_KEY
+        return API_BASE_URL, API_MODEL or LOCAL_MODEL, headers
+    return LLAMA_URL, LOCAL_MODEL, {}
+
+
+def mode() -> str:
+    return "hosted API" if API_BASE_URL else "local"
+
 SYSTEM_INSTRUCTION = (
     "You are a helpful AI assistant running locally on the user's machine. "
     "Always answer in the same language the user writes in (Khmer, English, or any other). "
@@ -92,16 +122,18 @@ def chat_stream(req: ChatRequest):
                 }
             )
 
-        yield sse({"type": "status", "text": "កំពុងគិត (local)…"})
+        base_url, model_name, headers = backend()
+        yield sse({"type": "status", "text": "កំពុងគិត (%s)…" % mode()})
         payload = {
-            "model": LOCAL_MODEL,
+            "model": model_name,
             "messages": build_messages(req),
             "stream": True,
             "max_tokens": 2048,
         }
         resp = requests.post(
-            LLAMA_URL + "/v1/chat/completions",
+            base_url + "/v1/chat/completions",
             json=payload,
+            headers=headers,
             stream=True,
             timeout=(10, 600),
         )
@@ -110,8 +142,8 @@ def chat_stream(req: ChatRequest):
             yield sse(
                 {
                     "type": "error",
-                    "text": "Local engine មិនឆ្លើយតបត្រឹមត្រូវ (HTTP %s)៖ %s"
-                    % (resp.status_code, text),
+                    "text": "%s មិនឆ្លើយតបត្រឹមត្រូវ (HTTP %s)៖ %s"
+                    % (mode(), resp.status_code, text),
                 }
             )
             yield sse({"type": "done"})
@@ -148,8 +180,8 @@ def chat_stream(req: ChatRequest):
         yield sse(
             {
                 "type": "error",
-                "text": "មិនអាចភ្ជាប់ទៅ local engine បានទេ — តើវាដំណើរការនៅ %s ទេ? (%s)"
-                % (LLAMA_URL, str(exc)[:200]),
+                "text": "មិនអាចភ្ជាប់ទៅ %s បានទេ — តើ %s ត្រូវបានកំណត់ឬដំណើរការ? (%s)"
+                % (mode(), backend()[0], str(exc)[:200]),
             }
         )
         yield sse({"type": "done"})
@@ -170,19 +202,23 @@ def chat(req: ChatRequest):
 
 @app.get("/api/health")
 def health():
-    model_name = ""
-    try:
-        r = requests.get(LLAMA_URL + "/v1/models", timeout=3)
-        data = r.json().get("data") or []
-        if data:
-            model_name = data[0].get("id", "")
-    except Exception:
-        model_name = ""
+    """Reports the active engine. Deliberately never exposes the key value."""
+    base_url, model_name, _headers = backend()
+    if not API_BASE_URL:
+        try:
+            r = requests.get(base_url + "/v1/models", timeout=3)
+            data = r.json().get("data") or []
+            if data:
+                model_name = data[0].get("id", "")
+        except Exception:
+            pass
     return {
         "ok": True,
-        "app": "Buffy AI (local)",
-        "engine": LLAMA_URL,
-        "model": model_name or LOCAL_MODEL,
+        "app": "Buffy AI",
+        "mode": mode(),
+        "engine": base_url,
+        "model": model_name,
+        "key_set": bool(API_KEY),
     }
 
 
