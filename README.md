@@ -21,6 +21,7 @@ UI ដូចគ្នាទាំងពីរ៖ dark theme ស្ទីល GPT,
 | `local_app.py` | Server local៖ proxy ទៅ engine OpenAI-compatible (Ollama / llama.cpp) |
 | `ui.py` | UI HTML/CSS/JS តែមួយ (ប្រើដោយ app ទាំងពីរ) |
 | `build_notebooks.py` | បង្កើត notebook ឡើងវិញពីកូដ (`python build_notebooks.py`) |
+| `push_to_github.sh` | រុញ project ទៅ GitHub ដោយពាក្យបញ្ជាតែមួយ |
 
 ## របៀបប្រើ (Gemini)
 
@@ -44,6 +45,17 @@ UI ដូចគ្នាទាំងពីរ៖ dark theme ស្ទីល GPT,
 > **Qwen3.8-2.4T-A95B មិនអាចរត់ក្នុង Colab បានទេ**៖ weights ដើម ~4.9 TB,
 > GGUF តូចបំផុត ~397 GB, ត្រូវការ RAM/VRAM ~410 GB+. Colab មាន RAM 12–50 GB
 > និង disk ~100 GB។ នេះជាដែនកំណត់ hardware មិនមែនបញ្ហា link ទេ។
+
+## Push ទៅ GitHub
+
+```bash
+# 1) បង្កើត repo ទទេលើ https://github.com/new (កុំធីក "Add a README")
+# 2) រត់៖
+./push_to_github.sh https://github.com/<username>/<repo>.git
+```
+
+បើ git សួរ password សូមប្រើ **Personal Access Token ថ្មី** (scope `repo`) — មិនត្រូវប្រើ token ចាស់
+ដែលបាន paste ក្នុង chat ឡើយ (សូម revoke វាមុន)។
 
 ## សុវត្ថិភាព
 
