@@ -55,13 +55,23 @@ EXA_SEARCH_URL = os.environ.get("EXA_SEARCH_URL", "https://api.exa.ai/search")
 SEARCH_TOP_N = 5
 
 
+def _normalize_base(url: str) -> str:
+    """Strip trailing slash and a trailing /v1 so the caller can append
+    "/v1/chat/completions" exactly once. Users often paste the URL with /v1
+    (e.g. https://openrouter.ai/api/v1); without it the request would 404."""
+    url = (url or "").rstrip("/")
+    if url.endswith("/v1"):
+        url = url[: -len("/v1")].rstrip("/")
+    return url
+
+
 def backend():
     """(base_url, model, headers) for the engine that is currently configured."""
     if API_BASE_URL:
         headers = {"Content-Type": "application/json"}
         if API_KEY:
             headers["Authorization"] = "Bearer " + API_KEY
-        return API_BASE_URL, API_MODEL or LOCAL_MODEL, headers
+        return _normalize_base(API_BASE_URL), API_MODEL or LOCAL_MODEL, headers
     return LLAMA_URL, LOCAL_MODEL, {}
 
 
