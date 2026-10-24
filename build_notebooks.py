@@ -220,15 +220,21 @@ PORT = 8000
 os.environ["LLAMA_URL"] = "http://127.0.0.1:11434"
 os.environ["LOCAL_MODEL"] = "buffy-coder"
 
-# Web search (Exa) — បើអ្នកដាក់ EXA_API_KEY ក្នុង Colab 🔑 Secrets វានឹងបើក search
+# Web search (Exa) — key ត្រូវដាក់ក្នុង Colab 🔑 Secrets (ឈ្មោះ EXA_API_KEY)
+# របៀប៖ sidebar ខាងឆ្វេង → 🔑 Secrets → Add New Secret
+#   Name = EXA_API_KEY   Value = key របស់អ្នក   → បើក toggle "Notebook access"
 try:
     from google.colab import userdata
     _k = userdata.get("EXA_API_KEY")
     if _k:
         os.environ["EXA_API_KEY"] = _k
         print("✅ EXA_API_KEY បានផ្ទុកពី Colab Secrets — web search បើក")
+    else:
+        print("ℹ️ EXA_API_KEY ទទេ — web search បិទ (app នៅតែរត់)។ ដាក់បាន: 🔑 Secrets")
 except Exception:
-    pass  # គ្មាន key = search បិទ, app នៅតែរត់ធម្មតា
+    print("ℹ️ រកមិនឃើញ EXA_API_KEY ក្នុង Colab Secrets — web search បិទ (app នៅតែរត់)។")
+    print("   ដាក់បានឥឡូវ៖ sidebar ខាងឆ្វេង → 🔑 Secrets → Add New Secret")
+    print("   Name = EXA_API_KEY , Value = key , រួចបើក toggle 'Notebook access' → run cell នេះម្តងទៀត")
 
 # កំដៅម៉ូដែល (load ចូល GPU មុន) ដើម្បីឲ្យសារដំបូងក្នុង UI លឿន
 print("🔥 កំពុង load ម៉ូដែលចូល GPU … (អាចយូរ ~1 នាទី)")
