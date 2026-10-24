@@ -48,10 +48,19 @@ trap cleanup INT TERM EXIT
 # ─── ១/៥ Ollama ────────────────────────────────────────────────────────────
 say "១/៥  ពិនិត្យ Ollama"
 
+# Ollama ចេញជា .tar.zst — Colab ត្រូវការ zstd សិន (តូច ~1MB)
+ensure_zstd() {
+  command -v zstd >/dev/null 2>&1 && return 0
+  echo "   ដំឡើង zstd (ត្រូវការសម្រាប់ Ollama) …"
+  (apt-get update -qq && apt-get install -y -qq zstd) >>"$WORK/ollama-install.log" 2>&1 || true
+  command -v zstd >/dev/null 2>&1
+}
+
 # ដំឡើងតាម script ផ្លូវការ; បើបរាជ័យ (ឧ. ollama.com ត្រូវបានបិទ/យឺត) → ទាញ binary ពី GitHub ផ្ទាល់
 install_ollama() {
   local log="$WORK/ollama-install.log"
-  local arch tgz
+  local arch zst
+  ensure_zstd || echo "   ⚠️  zstd មិនអាចដំឡើងបាន — សាកបន្តទៅមុខទៀត"
   echo "   កំពុងដំឡើងតាម ollama.com …"
   if curl -fsSL https://ollama.com/install.sh -o "$WORK/install.sh" 2>"$log" && sh "$WORK/install.sh" >>"$log" 2>&1; then
     return 0
@@ -63,13 +72,14 @@ install_ollama() {
     *) arch="" ;;
   esac
   [ -n "$arch" ] || return 1
-  tgz="$WORK/ollama-linux-$arch.tgz"
-  if curl -fL --retry 3 --progress-bar -o "$tgz" \
-      "https://github.com/ollama/ollama/releases/latest/download/ollama-linux-$arch.tgz" >>"$log" 2>&1; then
-    if tar -C /usr/local -xzf "$tgz" >>"$log" 2>&1; then
+  zst="$WORK/ollama-linux-$arch.tar.zst"
+  if curl -fL --retry 3 --progress-bar -o "$zst" \
+      "https://github.com/ollama/ollama/releases/latest/download/ollama-linux-$arch.tar.zst" >>"$log" 2>&1; then
+    if tar --zstd -C /usr/local -xf "$zst" >>"$log" 2>&1 \
+       || tar -C /usr/local --use-compress-program=unzstd -xf "$zst" >>"$log" 2>&1; then
       [ -x /usr/local/bin/ollama ] && \
         ln -sf /usr/local/bin/ollama /usr/bin/ollama 2>/dev/null || true
-      rm -f "$tgz"
+      rm -f "$zst"
       return 0
     fi
   fi
