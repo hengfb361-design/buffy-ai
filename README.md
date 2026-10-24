@@ -26,12 +26,11 @@ Repo៖ https://github.com/hengfb361-design/buffy-ai
 ក្នុង Colab cell ថ្មី សរសេរបន្ទាត់នេះ **ទាំង `!` នៅដើម** (បើអត់ `!` វាចេញ `SyntaxError: invalid syntax`)៖
 
 ```bash
-!curl -fsSL -o /content/buffy-start.sh https://site-0cca59b7138a4d9a8ddbbdb1cedf34b7.freebuff.page/colab-start.sh && bash /content/buffy-start.sh
+!curl -fsSL -o /content/buffy-start.sh https://raw.githubusercontent.com/hengfb361-design/buffy-ai/main/colab-start.sh && bash /content/buffy-start.sh
 ```
 
-> បន្ទាត់នេះប្រើ URL ដែលបានបង្ហោះរួច — ដំណើរការភ្លាម គ្មានត្រូវ push។ បើអ្នក push ឯកសារនេះ
-> ទៅ `main` ស្រាប់ អាចប្រើ version GitHub វិញ៖
-> `!curl -fsSL -o /content/buffy-start.sh https://raw.githubusercontent.com/hengfb361-design/buffy-ai/main/colab-start.sh && bash /content/buffy-start.sh`
+> បើ GitHub ត្រូវបានបិទ/យឺត មាន mirror ដូចគ្នានៅ Freebuff Sites៖
+> `!curl -fsSL -o /content/buffy-start.sh https://site-0cca59b7138a4d9a8ddbbdb1cedf34b7.freebuff.page/colab-start.sh && bash /content/buffy-start.sh`
 
 វានឹងធ្វើអ្វីៗទាំងអស់ដោយស្វ័យប្រវត្តិ៖
 
@@ -45,9 +44,8 @@ Repo៖ https://github.com/hengfb361-design/buffy-ai
 > `!BUFFY_MODEL_TAG=my-model BUFFY_ACCESS_KEY=mykey bash /content/buffy-start.sh`
 > (ឬដាក់ `BUFFY_ACCESS_KEY` / `EXA_API_KEY` ក្នុង Colab 🔑 Secrets)
 
-> ⚠️ version ដែលបង្ហោះ (Freebuff Sites) បម្រើ `local_app.py` និង `ui.py` ថ្មីៗផ្ទាល់ —
-> រួមទាំង CORS និង `ACCESS_KEY` ដែរ។ ចំណែក version GitHub ទាញពី branch `main`
-> ដូច្នេះត្រូវ **push ការកែនេះ** សិន បើអ្នកចង់ប្រើ URL របស់ GitHub។
+> script ទាញ `local_app.py` និង `ui.py` ពី branch `main` ដូចគ្នា — ដូច្នេះបើអ្នកកែ server
+> ត្រូវ push សិន។ Mirror (Freebuff Sites) មានឯកសារដូចគ្នានិងដំណើរការដូចគ្នា។
 
 ## របៀបប្រើតាម notebook
 
