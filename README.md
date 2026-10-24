@@ -21,21 +21,73 @@
 
 Repo៖ https://github.com/hengfb361-design/buffy-ai
 
-## របៀបប្រើ
+## ផ្លូវលឿនបំផុត — បន្ទាត់តែមួយ (គ្មាន notebook)
+
+ក្នុង Colab cell ថ្មី សរសេរបន្ទាត់នេះ **ទាំង `!` នៅដើម** (បើអត់ `!` វាចេញ `SyntaxError: invalid syntax`)៖
+
+```bash
+!curl -fsSL -o /content/buffy-start.sh https://site-0cca59b7138a4d9a8ddbbdb1cedf34b7.freebuff.page/colab-start.sh && bash /content/buffy-start.sh
+```
+
+> បន្ទាត់នេះប្រើ URL ដែលបានបង្ហោះរួច — ដំណើរការភ្លាម គ្មានត្រូវ push។ បើអ្នក push ឯកសារនេះ
+> ទៅ `main` ស្រាប់ អាចប្រើ version GitHub វិញ៖
+> `!curl -fsSL -o /content/buffy-start.sh https://raw.githubusercontent.com/hengfb361-design/buffy-ai/main/colab-start.sh && bash /content/buffy-start.sh`
+
+វានឹងធ្វើអ្វីៗទាំងអស់ដោយស្វ័យប្រវត្តិ៖
+
+1. ដំឡើង **Ollama** (បើគ្មាន) និងបើក engine
+2. ទាញយក **Qwen2.5-Coder-7B-Instruct-abliterated** `Q4_K_M` (~4.7 GB, ទាញបន្តបាន)
+3. `ollama create qwen2.5-coder-7b-abliterated`
+4. បើក API (`local_app.py`) + tunnel សាធារណៈ
+5. បង្ហាញ **URL** និង **API key** — រួច paste ចូល website → sidebar → **Colab**
+
+> បើអ្នកចង់ប្តូរម៉ូដែល/key ដោយខ្លួនឯង បន្ថែម env មុនពេលរត់ ឧ៖
+> `!BUFFY_MODEL_TAG=my-model BUFFY_ACCESS_KEY=mykey bash /content/buffy-start.sh`
+> (ឬដាក់ `BUFFY_ACCESS_KEY` / `EXA_API_KEY` ក្នុង Colab 🔑 Secrets)
+
+> ⚠️ version ដែលបង្ហោះ (Freebuff Sites) បម្រើ `local_app.py` និង `ui.py` ថ្មីៗផ្ទាល់ —
+> រួមទាំង CORS និង `ACCESS_KEY` ដែរ។ ចំណែក version GitHub ទាញពី branch `main`
+> ដូច្នេះត្រូវ **push ការកែនេះ** សិន បើអ្នកចង់ប្រើ URL របស់ GitHub។
+
+## របៀបប្រើតាម notebook
 
 1. បើក https://colab.research.google.com → **Upload** `Qwen_Code_Colab.ipynb`
 2. `Runtime → Change runtime type → T4 GPU`
 3. រត់ cell **1️⃣ ដំឡើង** → **2️⃣ ទាញយកម៉ូដែល** → **3️⃣ បើក UI**
-4. ចម្លង link `https://xxxx.trycloudflare.com` ហើយចាប់ផ្តើមជជែក
+4. cell **3️⃣** បង្ហាញ `URL` និង `API key` — ប្រើមួយក្នុងចំណោមពីរនេះ៖
+   - បើក URL នោះផ្ទាល់ ហើយជជែក (UI តែមួយ គ្មាន key ត្រូវការ ព្រោះជា same-origin)
+   - ឬប្រើ website សាធារណៈ (ឧ. `ai.onrender.com`) → **sidebar → Colab** → paste `URL` និង `API key`
+     រួចចុច **🔌 ភ្ជាប់ និងសាកល្បង**
+
+### ការតភ្ជាប់ពី website សាធារណៈ (URL + API key)
+
+Render គ្មាន GPU ដូច្នេះ website ត្រូវហៅម៉ូដែលដែលរត់ក្នុង Colab៖
+
+1. Colab cell **3️⃣** បង្ហាញពីរបន្ទាត់៖ `URL : https://…trycloudflare.com` និង `API key : …`
+2. ក្នុង website បើក sidebar → **Colab** (ក្រោមជម្រើសម៉ូដែល)
+3. paste បន្ទាត់ណាមួយ — ប្រព័ន្ធស្រង់ `URL` និង `API key` ដាក់ឲ្យខ្លួនឯង — រួចចុច **🔌 ភ្ជាប់ និងសាកល្បង**
+4. បើឃើញ ✅ បានភ្ជាប់ សារទាំងអស់នឹងទៅម៉ូដែលក្នុង Colab ផ្ទាល់
+
+- `URL` និង `API key` រក្សាទុកតែក្នុង `localStorage` របស់ browser នោះ — មិនឡើងទៅ server ណាមួយឡើយ
+- ដកចេញវិញ៖ លុប URL ចោល → ចុច **ភ្ជាប់ និងសាកល្បង** → ត្រឡប់ទៅ server របស់ website វិញ
+- `API key` បង្កើតដោយ Colab (ឬដាក់ `BUFFY_ACCESS_KEY` ក្នុង Colab 🔑 Secrets ដើម្បីកំណត់ខ្លួនឯង)។
+  Server ត្រូវការ key នេះតែពេលហៅពី origin ដទៃ (ឧ. website លើ Render) — page ដែល Colab
+  បើកផ្ទាល់ នៅតែប្រើបានដោយគ្មាន key
+- CORS ត្រូវបានបើកនៅ `/api/*` ដើម្បីឲ្យ browser ហៅ tunnel ដោយផ្ទាល់ (គ្មាន cookie ត្រូវបានប្រើ)
 
 ### ម៉ូដែលដែលអាចជ្រើស (ទំហំពិតពី Hugging Face)
 
 | ជម្រើស | ទំហំ | កំណត់សម្គាល់ |
 |---|---|---|
-| `qwen38b` (default) — Qwen3-8B `Q4_K_M` | 5.0 GB | សមល្មមសម្រាប់ T4 16GB; លឿន; ឆ្លើយបានល្អ |
+| `coder7b_ablit` (default) — Qwen2.5-Coder-7B-Instruct **abliterated** `Q4_K_M` | 4.7 GB | គ្មាន refusal ដែលរំខានពេលសរសេរកូដ; ស្រាល; រត់បានលើ T4 និង CPU |
+| `qwen38b` — Qwen3-8B `Q4_K_M` | 5.0 GB | សមល្មមសម្រាប់ T4 16GB; លឿន; ឆ្លើយបានល្អ |
 | `coder30b` — Qwen3-Coder-30B-A3B `Q3_K_S` | 13.3 GB | ល្អបំផុតសម្រាប់ code; MoE 3B active → លឿន; ត្រូវការ T4 16GB |
 | `qwen38_27b` — Qwen3.8-27B `UD-IQ3_S` | 12.0 GB | ជំនាន់ថ្មី; dense → យឺតជាង |
 | `coder7b` — Qwen2.5-Coder-7B `Q4_K_M` | 4.7 GB | ស្រាល/លឿន; រត់បានលើ CPU (យឺត) |
+
+> ម៉ូដែល abliterated គឺយក refusal direction ចេញពី weights — វាមិនមែនជាការបន្ថែមសមត្ថភាពទេ
+> តែវាបន្ថយការបដិសេធដែលមិនចាំបាច់។ អ្នកនៅទទួលខុសត្រូវលើអ្វីដែលអ្នកសួរ និងផលដែលបានមក។
+> GGUF មកពី `bartowski/Qwen2.5-Coder-7B-Instruct-abliterated-GGUF`។
 
 > **Qwen3.8-2.4T-A95B មិនអាចរត់ក្នុង Colab បានទេ**៖ weights ដើម ~4.9 TB,
 > GGUF តូចបំផុត ~397 GB, ត្រូវការ RAM/VRAM ~410 GB+. Colab មាន RAM 12–50 GB
@@ -64,6 +116,7 @@ Website/`local_app.py` អាចប្រើ backend ពីរ — **key អា�
 | `LLAMA_URL` | engine local (Ollama / llama.cpp) — ប្រើពេល `API_BASE_URL` ទទេ | env |
 | `LOCAL_MODEL` | model id នៅក្នុង engine local | env |
 | `EXA_API_KEY` | **web search** សម្រាប់បង្ហាញប្រភព (Exa) — គ្មាន key = search បិទ | Sites → Secrets / Colab 🔑 Secrets |
+| `ACCESS_KEY` | key ដែល Colab បង្ហាញ សម្រាប់ឲ្យ website ខាងក្រៅហៅមក (គ្មាន = គ្មានការការពារ) | Colab cell **3️⃣** កំណត់ដោយស្វ័យប្រវត្តិ |
 
 - **មិនកំណត់** `API_BASE_URL` → ប្រើ engine local (`LLAMA_URL`) ដូចមុន
 - **កំណត់** `API_BASE_URL` → ប្រើ API ពិត, `API_KEY` បញ្ជូនជា `Authorization: Bearer …` (តែនៅ server)

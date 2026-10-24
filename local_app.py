@@ -19,20 +19,24 @@ Environment:
     API_KEY      bearer key for that API — set it in Sites → Secrets / env,
                  never in the browser or the source code
     API_MODEL    model id for that API (falls back to LOCAL_MODEL)
+    ACCESS_KEY   key the Colab notebook prints; when set, calls from another
+                 origin (the public website) must send it as a bearer token
 
 When API_BASE_URL is set the app calls that hosted API; otherwise it uses the
 local engine at LLAMA_URL. The key is only ever read from the environment on
 the server, so the public page never receives it.
 """
 
+import hmac
 import json
 import os
 import traceback
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 import requests
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List
 
@@ -46,6 +50,12 @@ LOCAL_MODEL = os.environ.get("LOCAL_MODEL", "buffy-coder")
 API_BASE_URL = os.environ.get("API_BASE_URL", "").rstrip("/")
 API_KEY = os.environ.get("API_KEY", "").strip()
 API_MODEL = os.environ.get("API_MODEL", "").strip()
+
+# Access key printed by the Colab notebook. When set, calls that come from
+# another origin (e.g. the public website on Render) must send it as
+# "Authorization: Bearer <key>". Same-origin calls — the page this app serves —
+# are already protected by the tunnel URL itself and keep working.
+ACCESS_KEY = os.environ.get("ACCESS_KEY", "").strip()
 
 # Optional web search for source citations (Exa). Read from the server
 # environment only — the browser never receives it.
@@ -142,6 +152,43 @@ SYSTEM_INSTRUCTION = (
 )
 
 app = FastAPI(title="Buffy AI (local)")
+
+# The website on another origin calls this server straight from the browser,
+# so allow cross-origin requests. No cookies are used (the key travels in a
+# header), which is why "*" is safe here.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
+    max_age=600,
+)
+
+
+def _same_origin(request: Request) -> bool:
+    """True for the page this app serves (or for server-side callers such as
+    the notebook's health check, which send no Origin header)."""
+    origin = request.headers.get("origin") or ""
+    host = request.headers.get("host") or ""
+    if not origin or not host:
+        return True
+    return urlparse(origin).netloc == host
+
+
+def _key_ok(request: Request) -> bool:
+    supplied = (request.headers.get("x-api-key") or "").strip()
+    auth = request.headers.get("authorization") or ""
+    if not supplied and auth.lower().startswith("bearer "):
+        supplied = auth[7:].strip()
+    return bool(supplied) and hmac.compare_digest(supplied, ACCESS_KEY)
+
+
+def _unauthorized() -> JSONResponse:
+    return JSONResponse(
+        {"detail": "API key មិនត្រឹមត្រូវ — paste key ដែល Colab បង្ហាញក្នុង sidebar។"},
+        status_code=401,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 class ImageIn(BaseModel):
@@ -275,7 +322,9 @@ def chat_stream(req: ChatRequest):
 
 
 @app.post("/api/chat")
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, request: Request):
+    if ACCESS_KEY and not _same_origin(request) and not _key_ok(request):
+        return _unauthorized()
     return StreamingResponse(
         chat_stream(req),
         media_type="text/event-stream",
@@ -288,8 +337,10 @@ def chat(req: ChatRequest):
 
 
 @app.get("/api/health")
-def health():
+def health(request: Request):
     """Reports the active engine. Deliberately never exposes the key value."""
+    if ACCESS_KEY and not _same_origin(request) and not _key_ok(request):
+        return _unauthorized()
     base_url, model_name, _headers = backend()
     if not API_BASE_URL:
         try:
@@ -306,6 +357,7 @@ def health():
         "engine": base_url,
         "model": model_name,
         "key_set": bool(API_KEY),
+        "access_key_required": bool(ACCESS_KEY),
         "web_search": "exa" if EXA_API_KEY else "off",
     }
 

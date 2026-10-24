@@ -19,3 +19,6 @@ content/
 
 # build artifacts
 *.zip
+
+# hosted bootstrap copy (deployed to Freebuff Sites)
+sites/

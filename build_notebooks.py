@@ -45,8 +45,10 @@ for line in proc.stdout:
             found = True
             print("=" * 68)
             print("🎉 នេះជា link សម្រាប់ជជែក (បើកបានគ្រប់ឧបករណ៍):\\n")
-            print("   " + m.group(0))
+            print("   URL     : " + m.group(0))
+            print("   API key : " + os.environ.get("ACCESS_KEY", ""))
             print("\\n" + "=" * 68)
+            print("🔑 paste ទាំង URL និង API key ក្នុង website → sidebar → Colab។")
             print("⚠️ កុំបិទ cell នេះ — កម្មវិធីដំណើរការពេល cell នេះនៅរត់។")
             print("   ចុច ⏹ ដើម្បីបញ្ឈប់។")
 
@@ -78,6 +80,17 @@ Notebook នេះទាញយក **GGUF** ពី Hugging Face រួចរត�
 **គ្មាន API key, គ្មាន Gemini, គ្មានការចំណាយ** — ម៉ូដែលរត់លើ GPU របស់ Colab ផ្ទាល់។
 
 ---
+
+## ⚡ ផ្លូវលឿន — បន្ទាត់តែមួយ (គ្មាន notebook)
+
+មិនចង់រត់ cell ទាំងនេះ? ក្នុង Colab cell ថ្មី សរសេរបន្ទាត់នេះ (មាន `!` នៅដើម)៖
+
+```bash
+!curl -fsSL -o /content/buffy-start.sh https://raw.githubusercontent.com/hengfb361-design/buffy-ai/main/colab-start.sh && bash /content/buffy-start.sh
+```
+
+វាដំឡើង Ollama, ទាញ Qwen2.5-Coder-7B abliterated, បើក API + tunnel,
+រួចបង្ហាញ **URL** និង **API key** សម្រាប់ paste ចូល website។
 
 ## ⚠️ អានមុនគេ
 1. **ត្រូវការ GPU**៖ `Runtime → Change runtime type → T4 GPU` (Qwen3-8B ដែលជា default សមល្មមសម្រាប់ T4 16GB)
@@ -142,34 +155,45 @@ print(gpu or "⚠️ គ្មាន GPU — សូមបើក Runtime → Chan
 
 MODEL_CELL = '''#@title 2️⃣ ទាញយកម៉ូដែល + import ចូល Ollama
 #@markdown ជ្រើសម៉ូដែល (សូមមើលតារាងខាងលើ):
-MODEL_CHOICE = "qwen38b"  #@param ["qwen38b", "coder30b", "qwen38_27b", "coder7b"]
+MODEL_CHOICE = "coder7b_ablit"  #@param ["coder7b_ablit", "qwen38b", "coder30b", "qwen38_27b", "coder7b"]
 
 import os, subprocess, time, urllib.request
 
 MODELS = {
+    "coder7b_ablit": dict(
+        repo="bartowski/Qwen2.5-Coder-7B-Instruct-abliterated-GGUF",
+        file="Qwen2.5-Coder-7B-Instruct-abliterated-Q4_K_M.gguf",
+        size_gb=4.7, num_ctx=8192,
+        label="Qwen2.5-Coder-7B abliterated (Q4_K_M)",
+        tag="qwen2.5-coder-7b-abliterated",
+    ),
     "qwen38b": dict(
         repo="unsloth/Qwen3-8B-GGUF",
         file="Qwen3-8B-Q4_K_M.gguf",
         size_gb=5.0, num_ctx=8192,
         label="Qwen3-8B (Q4_K_M)",
+        tag="qwen3-8b",
     ),
     "coder30b": dict(
         repo="unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
         file="Qwen3-Coder-30B-A3B-Instruct-Q3_K_S.gguf",
         size_gb=13.3, num_ctx=4096,
         label="Qwen3-Coder-30B-A3B (Q3_K_S)",
+        tag="qwen3-coder-30b",
     ),
     "qwen38_27b": dict(
         repo="unsloth/Qwen3.8-27B-GGUF",
         file="Qwen3.8-27B-UD-IQ3_S.gguf",
         size_gb=12.0, num_ctx=4096,
         label="Qwen3.8-27B (UD-IQ3_S)",
+        tag="qwen3.8-27b",
     ),
     "coder7b": dict(
         repo="unsloth/Qwen2.5-Coder-7B-Instruct-GGUF",
         file="Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf",
         size_gb=4.7, num_ctx=8192,
         label="Qwen2.5-Coder-7B (Q4_K_M)",
+        tag="qwen2.5-coder-7b",
     ),
 }
 
@@ -184,7 +208,7 @@ if gpu:
     except Exception:
         gpu_gb = 0.0
 
-if gpu_gb < 15 and MODEL_CHOICE not in ("qwen38b", "coder7b"):
+if gpu_gb < 15 and MODEL_CHOICE not in ("qwen38b", "coder7b", "coder7b_ablit"):
     print(f"⚠️ GPU មានតែ {gpu_gb:.0f}GB (ឬគ្មាន) — ម៉ូដែល {MODELS[MODEL_CHOICE]['label']} "
           "អាចលើស memory។ ប្តូរទៅ 'coder7b' បើចង់ឲ្យរត់រលូន (ស្រាល លឿន)។")
 
@@ -207,8 +231,9 @@ PARAMETER temperature 0.3
 with open("/content/Modelfile", "w") as f:
     f.write(modelfile)
 
+MODEL_TAG = cfg.get("tag") or "buffy-coder"
 print("🧠 កំពុង import ចូល Ollama (អាចយូរ 1-3 នាទី) …")
-r = subprocess.run(["ollama", "create", "buffy-coder", "-f", "/content/Modelfile"],
+r = subprocess.run(["ollama", "create", MODEL_TAG, "-f", "/content/Modelfile"],
                    capture_output=True, text=True)
 print(r.stdout[-2000:] or r.stderr[-2000:])
 print("✅ ម៉ូដែលរួចរាល់" if r.returncode == 0 else "❌ import មិនបាន — សូមមើលសារខាងលើ")'''
@@ -217,8 +242,27 @@ RUN = '''#@title 3️⃣ បើក UI + link សាធារណៈ
 import os, re, subprocess, sys, time, urllib.request
 
 PORT = 8000
+# MODEL_TAG មកពី cell ២ (ឈ្មោះម៉ូដែលដែលបាន import) — បើរត់ cell នេះតែឯង ប្រើ "buffy-coder"
+MODEL_TAG = globals().get("MODEL_TAG", "buffy-coder")
 os.environ["LLAMA_URL"] = "http://127.0.0.1:11434"
-os.environ["LOCAL_MODEL"] = "buffy-coder"
+os.environ["LOCAL_MODEL"] = MODEL_TAG
+print("🧩 ម៉ូដែល:", MODEL_TAG)
+
+# Access key សម្រាប់ website ខាងក្រៅ (ឧ. ai.onrender.com) ហៅមក server នេះ។
+# បើអ្នកកំណត់ BUFFY_ACCESS_KEY ក្នុង Colab 🔑 Secrets វាប្រើតម្លៃនោះ បើអត់ វាបង្កើតថ្មី
+# មួយដោយស្វ័យប្រវត្តិ ហើយបង្ហាញនៅ cell ៣ (ព្រមជាមួយ URL)។
+import secrets
+
+ACCESS_KEY = os.environ.get("BUFFY_ACCESS_KEY", "").strip()
+if not ACCESS_KEY:
+    try:
+        from google.colab import userdata
+        ACCESS_KEY = (userdata.get("BUFFY_ACCESS_KEY") or "").strip()
+    except Exception:
+        ACCESS_KEY = ""
+if not ACCESS_KEY:
+    ACCESS_KEY = secrets.token_urlsafe(12)
+os.environ["ACCESS_KEY"] = ACCESS_KEY
 
 # Web search (Exa) — key ត្រូវដាក់ក្នុង Colab 🔑 Secrets (ឈ្មោះ EXA_API_KEY)
 # របៀប៖ sidebar ខាងឆ្វេង → 🔑 Secrets → Add New Secret
@@ -242,7 +286,7 @@ try:
     import requests
     requests.post(
         "http://127.0.0.1:11434/api/generate",
-        json={"model": "buffy-coder", "prompt": "hi", "stream": False,
+        json={"model": MODEL_TAG, "prompt": "hi", "stream": False,
               "options": {"num_predict": 1}},
         timeout=900,
     )

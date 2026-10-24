@@ -55,6 +55,14 @@ PAGE = r"""<!doctype html>
     border:1px solid var(--border);font-size:13.5px;outline:none;cursor:pointer;
   }
   select:focus{border-color:var(--accent)}
+  input[type=text],input[type=password]{
+    width:100%;padding:9px 10px;border-radius:10px;background:var(--panel-2);color:var(--text);
+    border:1px solid var(--border);font-size:12.5px;outline:none;font-family:inherit;
+  }
+  input[type=text]:focus,input[type=password]:focus{border-color:var(--accent)}
+  .conn{font-size:11px;color:var(--muted);padding:0 6px;line-height:1.45;min-height:15px;word-break:break-word}
+  .conn.ok{color:#3ddc97}
+  .conn.bad{color:#ff8f8f}
   .toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border);cursor:pointer}
   .toggle span{font-size:13px;display:flex;align-items:center;gap:8px}
   .toggle input{display:none}
@@ -228,6 +236,22 @@ PAGE = r"""<!doctype html>
         <option value="local" selected>Qwen · local (ក្នុង Colab)</option>
       </select>
     </div>
+
+    <div class="side-label">Colab</div>
+    <div class="field">
+      <label for="colabUrl">URL ពី Colab</label>
+      <input type="text" id="colabUrl" inputmode="url" autocomplete="off" spellcheck="false"
+             placeholder="https://xxxx.trycloudflare.com" />
+    </div>
+    <div class="field">
+      <label for="colabKey">API key ពី Colab</label>
+      <input type="password" id="colabKey" autocomplete="off" spellcheck="false"
+             placeholder="paste key ដែល Colab បង្ហាញ" />
+    </div>
+    <div class="side-actions">
+      <button class="ghost" id="connectBtn">🔌 ភ្ជាប់ និងសាកល្បង</button>
+    </div>
+    <div class="conn" id="connStatus">មិនទាន់ភ្ជាប់ — ប្រើ server របស់គេហទំព័រនេះ</div>
     <label class="toggle" for="webSearch">
       <span>🌐 ស្វែងរកអ៊ីនធឺណិត</span>
       <input type="checkbox" id="webSearch" checked />
@@ -245,7 +269,7 @@ PAGE = r"""<!doctype html>
     </div>
 
     <div class="side-foot">
-      ម៉ូដែល local · គ្មាន API key · ប្រវត្តិរក្សាទុកក្នុង browser
+      ម៉ូដែល local · URL និង API key រក្សាទុកតែក្នុង browser នេះ · ប្រវត្តិក៏ដូចគ្នា
     </div>
   </aside>
   <div class="scrim" id="scrim"></div>
@@ -305,7 +329,11 @@ PAGE = r"""<!doctype html>
   const imageMode = $("#imageMode");
   const modePill = $("#modePill");
   const topTitle = $("#topTitle");
+  const colabUrlEl = $("#colabUrl");
+  const colabKeyEl = $("#colabKey");
+  const connStatusEl = $("#connStatus");
   const STORE = "buffy-ai-chat-v2";
+  const STORE_CONN = "buffy-ai-colab-v1";
 
   const state = { messages: [], attachments: [], busy: false, controller: null };
 
@@ -337,6 +365,94 @@ PAGE = r"""<!doctype html>
       }
     } catch (e) { /* ignore */ }
   }
+
+  /* ---------------- Colab connection (URL + API key) ---------------- */
+  /* The model runs in Google Colab, behind a public trycloudflare link the
+     notebook prints together with an API key. Both are kept only in this
+     browser's localStorage and sent with each request. */
+  function colabBase() {
+    return (colabUrlEl.value || "").trim().replace(/\/+$/, "");
+  }
+  function colabKey() {
+    return (colabKeyEl.value || "").trim();
+  }
+  function endpoint(path) {
+    const base = colabBase();
+    return base ? base + path : path;
+  }
+  function requestHeaders(json) {
+    const h = json ? { "Content-Type": "application/json" } : {};
+    const key = colabKey();
+    if (key) h["Authorization"] = "Bearer " + key;
+    return h;
+  }
+  function setConn(text, kind) {
+    connStatusEl.textContent = text;
+    connStatusEl.className = "conn" + (kind ? " " + kind : "");
+  }
+  function saveConn() {
+    try {
+      localStorage.setItem(STORE_CONN, JSON.stringify({ url: colabUrlEl.value.trim(), key: colabKeyEl.value.trim() }));
+    } catch (e) { /* quota, ignore */ }
+  }
+  function loadConn() {
+    try {
+      const d = JSON.parse(localStorage.getItem(STORE_CONN) || "{}");
+      if (d.url) colabUrlEl.value = d.url;
+      if (d.key) colabKeyEl.value = d.key;
+    } catch (e) { /* ignore */ }
+    if (colabBase()) setConn("ភ្ជាប់ទៅ " + colabBase());
+  }
+
+  /* The notebook prints «URL : …» and «API key : …»; pasting either line into
+     either box fills both. */
+  function parseColabPaste(text) {
+    const out = {};
+    const url = (text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i) || [])[0];
+    if (url) out.url = url.replace(/\/+$/, "");
+    const key = text.match(/(?:api[ _-]?key|key)\s*[:=]\s*([A-Za-z0-9_\-]{6,})/i);
+    if (key) out.key = key[1];
+    return out;
+  }
+  function onConnPaste(event) {
+    const raw = (event.clipboardData || window.clipboardData).getData("text") || "";
+    const parsed = parseColabPaste(raw);
+    if (!parsed.url && !parsed.key) return;
+    event.preventDefault();
+    if (parsed.url) colabUrlEl.value = parsed.url;
+    if (parsed.key) colabKeyEl.value = parsed.key;
+    saveConn();
+    setConn("កំពុងភ្ជាប់…");
+    testConnection();
+  }
+  colabUrlEl.addEventListener("paste", onConnPaste);
+  colabKeyEl.addEventListener("paste", onConnPaste);
+
+  async function testConnection() {
+    const base = colabBase();
+    if (!base) { setConn("សូម paste URL ពី Colab សិន", "bad"); return false; }
+    setConn("កំពុងភ្ជាប់…");
+    try {
+      const res = await fetch(base + "/api/health", { headers: requestHeaders(false) });
+      if (res.status === 401) throw new Error("API key មិនត្រឹមត្រូវ");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (data.model && modelSel.options[0]) {
+        modelSel.options[0].textContent = data.model + " · ក្នុង Colab";
+      }
+      setConn("✅ បានភ្ជាប់ · " + (data.model || "ម៉ូដែល local"), "ok");
+      return true;
+    } catch (err) {
+      setConn("❌ មិនភ្ជាប់បាន — " + (err.message || err), "bad");
+      return false;
+    }
+  }
+  $("#connectBtn").onclick = async () => {
+    saveConn();
+    await testConnection();
+  };
+  colabUrlEl.addEventListener("change", saveConn);
+  colabKeyEl.addEventListener("change", saveConn);
 
   /* ---------------- rendering ---------------- */
   function hideEmpty() { if (emptyEl && emptyEl.parentNode) emptyEl.remove(); }
@@ -536,9 +652,9 @@ PAGE = r"""<!doctype html>
     };
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch(endpoint("/api/chat"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: requestHeaders(true),
         body: JSON.stringify({
           message: text,
           model: modelSel.value,
@@ -672,6 +788,7 @@ PAGE = r"""<!doctype html>
 
   /* boot */
   load();
+  loadConn();
   bindChips(document);
   updateMode();
   renderAll();
