@@ -19,12 +19,48 @@
 set -euo pipefail
 
 RAW_BASE="${BUFFY_RAW_BASE:-https://raw.githubusercontent.com/hengfb361-design/buffy-ai/main}"
-HF_REPO="${BUFFY_HF_REPO:-bartowski/Qwen2.5-Coder-7B-Instruct-abliterated-GGUF}"
-HF_FILE="${BUFFY_HF_FILE:-Qwen2.5-Coder-7B-Instruct-abliterated-Q4_K_M.gguf}"
-MODEL_TAG="${BUFFY_MODEL_TAG:-qwen2.5-coder-7b-abliterated}"
 PORT="${PORT:-8000}"
 WORK="${BUFFY_HOME:-/content/buffy-api}"
 OLLAMA_URL_LOCAL="http://127.0.0.1:11434"
+
+# ជម្រើសម៉ូដែល — script រើសតាម VRAM ដែល Colab មាន (បញ្ជាបានដោយ BUFFY_MODEL=coder32b|coder30b|coder7b|coder3b)
+#   coder32b = Qwen2.5-Coder-32B Q4_K_M (19.85GB — "model 20g") ត្រូវការ A100/L4 24GB+
+#   coder30b = Qwen3-Coder-30B-A3B Q3_K_S (13.3GB, MoE 3B active → លឿន) សម្រាប់ T4 16GB
+#   coder7b  = Qwen2.5-Coder-7B abliterated Q4_K_M (4.7GB) ស្រាល/លឿន
+#   coder3b  = Qwen2.5-Coder-3B abliterated Q4_K_M (1.9GB) លឿនបំផុត / គ្មាន GPU
+HF_REPO=""; HF_FILE=""; MODEL_TAG=""; MODEL_SIZE_GB=""; CTX=4096; VRAM_GIB=0
+
+choose_model() {
+  local mib
+  mib=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -dc '0-9' || true)
+  [ -n "$mib" ] || mib=0
+  VRAM_GIB=$(( mib / 1024 ))
+  case "${BUFFY_MODEL:-}" in
+    coder32b|coder30b|coder7b|coder3b) VRAM_GIB=99 ;;  # force: រំលងការពិនិត្យ GPU
+  esac
+  if [ "${BUFFY_MODEL:-}" = "coder32b" ] || [ -z "${BUFFY_MODEL:-}" ] && [ "$VRAM_GIB" -ge 23 ]; then
+    HF_REPO="bartowski/Qwen2.5-Coder-32B-Instruct-GGUF"
+    HF_FILE="Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf"
+    MODEL_TAG="qwen2.5-coder-32b"; MODEL_SIZE_GB="19.9"
+  elif [ "${BUFFY_MODEL:-}" = "coder30b" ] || [ -z "${BUFFY_MODEL:-}" ] && [ "$VRAM_GIB" -ge 13 ]; then
+    HF_REPO="unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF"
+    HF_FILE="Qwen3-Coder-30B-A3B-Instruct-Q3_K_S.gguf"
+    MODEL_TAG="qwen3-coder-30b"; MODEL_SIZE_GB="13.3"
+  elif [ "${BUFFY_MODEL:-}" = "coder7b" ] || [ -z "${BUFFY_MODEL:-}" ] && [ "$VRAM_GIB" -ge 8 ]; then
+    HF_REPO="bartowski/Qwen2.5-Coder-7B-Instruct-abliterated-GGUF"
+    HF_FILE="Qwen2.5-Coder-7B-Instruct-abliterated-Q4_K_M.gguf"
+    MODEL_TAG="qwen2.5-coder-7b-abliterated"; MODEL_SIZE_GB="4.7"
+  else
+    HF_REPO="bartowski/Qwen2.5-Coder-3B-Instruct-abliterated-GGUF"
+    HF_FILE="Qwen2.5-Coder-3B-Instruct-abliterated-Q4_K_M.gguf"
+    MODEL_TAG="qwen2.5-coder-3b-abliterated"; MODEL_SIZE_GB="1.9"
+  fi
+  HF_REPO="${BUFFY_HF_REPO:-$HF_REPO}"
+  HF_FILE="${BUFFY_HF_FILE:-$HF_FILE}"
+  MODEL_TAG="${BUFFY_MODEL_TAG:-$MODEL_TAG}"
+  CTX="${BUFFY_NUM_CTX:-4096}"
+}
+choose_model
 
 say()  { printf '\n\033[1;36m%s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32m✅ %s\033[0m\n' "$*"; }
@@ -114,7 +150,7 @@ ok "Ollama ដំណើរការ"
 
 # ─── ២/៥ ទាញយកម៉ូដែល ──────────────────────────────────────────────────────
 GGUF="$WORK/$HF_FILE"
-say "២/៥  ទាញយក $HF_FILE (~4.7 GB)"
+say "២/៥  ទាញយក $HF_FILE (~$MODEL_SIZE_GB GB) — GPU ${VRAM_GIB}GB, model «$MODEL_TAG»"
 if [ -s "$GGUF" ]; then
   ok "មានឯកសាររួចហើយ ($(du -h "$GGUF" | cut -f1)) — រំលងការទាញយក"
 else
@@ -131,8 +167,8 @@ if ollama show "$MODEL_TAG" >/dev/null 2>&1; then
 else
   cat >"$WORK/Modelfile" <<EOF
 FROM $GGUF
-PARAMETER num_ctx 8192
-PARAMETER temperature 0.3
+PARAMETER num_ctx $CTX
+PARAMETER temperature 0.4
 EOF
   ollama create "$MODEL_TAG" -f "$WORK/Modelfile" >"$WORK/ollama-create.log" 2>&1 \
     || die "import មិនបាន — សូមមើល $WORK/ollama-create.log"

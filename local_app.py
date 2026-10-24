@@ -146,9 +146,14 @@ def with_web_context(message: str, notes) -> str:
 
 SYSTEM_INSTRUCTION = (
     "You are a helpful AI assistant running locally on the user's machine. "
-    "Always answer in the same language the user writes in (Khmer, English, or any other). "
-    "Be accurate and clear; use Markdown lists, tables and fenced code blocks with language "
-    "tags when they help. Never invent facts — if you are unsure, say so."
+    "Always answer in the same language the user writes in (Khmer, English, or any other) — "
+    "for Khmer questions, reply in Khmer. "
+    "Answer the question as asked: be helpful, comply with the request, and stay concise; "
+    "only refuse when a request is clearly illegal or genuinely harmful, and when you do, "
+    "say so briefly and offer a safe alternative. Do not lecture the user about safety for "
+    "ordinary creative, technical or educational questions. "
+    "Use Markdown lists, tables and fenced code blocks with language tags when they help. "
+    "Never invent facts — if you are unsure, say so."
 )
 
 app = FastAPI(title="Buffy AI (local)")
@@ -216,12 +221,12 @@ def sse(obj: dict) -> str:
 
 def build_messages(req: ChatRequest, user_text: str = "") -> List[dict]:
     messages = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
-    for turn in req.history[-16:]:
+    for turn in req.history[-10:]:
         text = (turn.text or "").strip()
         if not text:
             continue
         role = "user" if turn.role == "user" else "assistant"
-        messages.append({"role": role, "content": text[:6000]})
+        messages.append({"role": role, "content": text[:2500]})
     messages.append({"role": "user", "content": user_text or req.message.strip() or "(empty message)"})
     return messages
 
@@ -262,7 +267,9 @@ def chat_stream(req: ChatRequest):
             "model": model_name,
             "messages": build_messages(req, user_text),
             "stream": True,
-            "max_tokens": 2048,
+            # ល្បឿន: ctx តូច → prompt ដំណើរការលឿន; ចម្លើយកំណត់ប្រវែង → token ទាប
+            "max_tokens": 1400,
+            "options": {"num_ctx": 4096, "num_predict": 1400, "temperature": 0.4},
         }
         resp = requests.post(
             base_url + "/v1/chat/completions",
@@ -284,15 +291,17 @@ def chat_stream(req: ChatRequest):
             return
 
         started = False
-        for line in resp.iter_lines(decode_unicode=True):
-            if not line:
+        for raw in resp.iter_lines(decode_unicode=False):
+            if not raw:
                 continue
-            if line.startswith("data: "):
-                line = line[6:].strip()
-            if line == "[DONE]":
+            # decode ជា UTF-8 ដោយខ្លួនឯង — បើទុកឲ្យ requests សម្គាល់ charset វាច្របូកច្របល់
+            # អក្សរខ្មែរ (mojibake)
+            if raw.startswith(b"data: "):
+                raw = raw[6:].strip()
+            if raw.strip() == b"[DONE]":
                 break
             try:
-                chunk = json.loads(line)
+                chunk = json.loads(raw.decode("utf-8"))
             except Exception:
                 continue
             choices = chunk.get("choices") or []

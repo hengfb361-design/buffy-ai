@@ -89,22 +89,28 @@ Notebook នេះទាញយក **GGUF** ពី Hugging Face រួចរត�
 !curl -fsSL -o /content/buffy-start.sh https://raw.githubusercontent.com/hengfb361-design/buffy-ai/main/colab-start.sh && bash /content/buffy-start.sh
 ```
 
-វាដំឡើង Ollama, ទាញ Qwen2.5-Coder-7B abliterated, បើក API + tunnel,
-រួចបង្ហាញ **URL** និង **API key** សម្រាប់ paste ចូល website។
+វាដំឡើង Ollama + zstd, **រើស model តាម GPU ដែលមាន** (A100 → 20GB, T4 → 30B-A3B, គ្មាន GPU → 3B)
+ហើយបើក API + tunnel រួចបង្ហាញ **URL** និង **API key** សម្រាប់ paste ចូល website។
 
 ## ⚠️ អានមុនគេ
-1. **ត្រូវការ GPU**៖ `Runtime → Change runtime type → T4 GPU` (Qwen3-8B ដែលជា default សមល្មមសម្រាប់ T4 16GB)
-2. **ទំហំ**៖ ម៉ូដែល 13GB ត្រូវការ disk ~30GB (ទាញយក + import) — Colab មាន ~100GB គ្រប់គ្រាន់
-3. **ពេលវេលា**៖ ទាញយក ~3–10 នាទី; ចម្លើយដំបូងយឺត (~1 នាទី) ព្រោះត្រូវ load ចូល GPU
+1. **GPU**៖ `Runtime → Change runtime type` → ប្រសើរជាងគេជា **A100** (ដំណើរការ model ~20GB)
+   តែ T4 GPU ក៏បាន — script នឹងរើស model សមរម្យដោយស្វ័យប្រវត្តិ
+2. **ទំហំ**៖ ម៉ូដែល 20GB ត្រូវការ disk ~35GB — Colab មាន ~100GB គ្រប់គ្រាន់
+3. **ល្បឿន**៖ ទាញយក ~2–10 នាទី; ចម្លើយដំបូង ~1 នាទី (load ចូល GPU) រួចលឿនស្រួច
+4. **model ធំមិនស្មើល្បឿនទេ** — បើចង់បានចម្លើយលឿនជាងគេ ជ្រើស `coder7b_ablit` ឬ `coder3b_ablit`
 
 ## ជម្រើសម៉ូដែល (ទំហំពិតពី Hugging Face)
 
 | ជម្រើស | ទំហំ | លក្ខណៈ |
 |---|---|---|
-| `qwen38b` (default) | 5.0 GB | Qwen3-8B Q4_K_M — ល្អណាស់សម្រាប់ T4, ឆាប់រៀន, សន្សំសំចៃ VRAM |
-| `coder30b` | 13.3 GB | Qwen3-Coder-30B-A3B — ល្អបំផុតសម្រាប់ code, MoE 3B active → លឿន |
-| `qwen38_27b` | 12.0 GB | Qwen3.8-27B — ជំនាន់ថ្មី, យឺតជាង (dense 27B) |
-| `coder7b` | 4.7 GB | Qwen2.5-Coder-7B — ស្រាល, លឿន, ប្រើបានលើ CPU |
+| `auto` (default) | — | script រើស model ធំបំផុតដែល GPU ទ្រាំបាន |
+| `coder32b` | 19.9 GB | Qwen2.5-Coder-32B Q4_K_M — ល្អបំផុត/ធំបំផុត (ត្រូវ A100 40GB ឬ L4 24GB) |
+| `coder30b` | 13.3 GB | Qwen3-Coder-30B-A3B — MoE 3B active → លឿន សម្រាប់ T4 16GB |
+| `coder7b_ablit` | 4.7 GB | Qwen2.5-Coder-7B abliterated — ស្រាល, លឿន, គ្មានការបដិសេធរំខាន |
+| `coder3b_ablit` | 1.9 GB | Qwen2.5-Coder-3B abliterated — លឿនបំផុត / គ្មាន GPU |
+| `qwen38b` | 5.0 GB | Qwen3-8B Q4_K_M |
+| `qwen38_27b` | 12.0 GB | Qwen3.8-27B — យឺតជាង (dense 27B) |
+| `coder7b` | 4.7 GB | Qwen2.5-Coder-7B (មិន abliterated) |
 
 > **ហេតុអ្វីមិនប្រើ Qwen3.8-2.4T-A95B?** វាជា MoE ២.៤ ទ្រីលាន parameter៖ weights ដើម 4.9TB,
 > GGUF តូចបំផុត ~397GB, ត្រូវការ RAM/VRAM 410GB+។ Colab មាន RAM 12–50GB និង disk ~100GB
@@ -119,6 +125,8 @@ Notebook នេះទាញយក **GGUF** ពី Hugging Face រួចរត�
 > ស្របច្បាប់ (TryHackMe, HackTheBox, DVWA) និងប្រព័ន្ធដែលអ្នកមានសិទ្ធិសាកល្បង។"""
 
 INSTALL = """#@title 1️⃣ ដំឡើង Ollama + cloudflared
+# zstd ត្រូវការសម្រាប់ Ollama (asset ជា .tar.zst) — Colab គ្មានវាមកជាមុន
+!apt-get update -qq && apt-get install -y -qq zstd
 # Ollama = engine សម្រាប់រត់ GGUF ក្នុងម៉ាស៊ីន ជាមួយ OpenAI-compatible API
 !curl -fsSL https://ollama.com/install.sh | sh
 !ollama --version
@@ -155,24 +163,18 @@ print(gpu or "⚠️ គ្មាន GPU — សូមបើក Runtime → Chan
 
 MODEL_CELL = '''#@title 2️⃣ ទាញយកម៉ូដែល + import ចូល Ollama
 #@markdown ជ្រើសម៉ូដែល (សូមមើលតារាងខាងលើ):
-MODEL_CHOICE = "coder7b_ablit"  #@param ["coder7b_ablit", "qwen38b", "coder30b", "qwen38_27b", "coder7b"]
+MODEL_CHOICE = "auto"  #@param ["auto", "coder32b", "coder30b", "coder7b_ablit", "coder3b_ablit", "qwen38b", "qwen38_27b", "coder7b"]
 
 import os, subprocess, time, urllib.request
 
 MODELS = {
-    "coder7b_ablit": dict(
-        repo="bartowski/Qwen2.5-Coder-7B-Instruct-abliterated-GGUF",
-        file="Qwen2.5-Coder-7B-Instruct-abliterated-Q4_K_M.gguf",
-        size_gb=4.7, num_ctx=8192,
-        label="Qwen2.5-Coder-7B abliterated (Q4_K_M)",
-        tag="qwen2.5-coder-7b-abliterated",
-    ),
-    "qwen38b": dict(
-        repo="unsloth/Qwen3-8B-GGUF",
-        file="Qwen3-8B-Q4_K_M.gguf",
-        size_gb=5.0, num_ctx=8192,
-        label="Qwen3-8B (Q4_K_M)",
-        tag="qwen3-8b",
+    "coder32b": dict(
+        repo="bartowski/Qwen2.5-Coder-32B-Instruct-GGUF",
+        file="Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf",
+        size_gb=19.9, num_ctx=4096,
+        label="Qwen2.5-Coder-32B (Q4_K_M, ~20GB)",
+        tag="qwen2.5-coder-32b",
+        need_vram=23,
     ),
     "coder30b": dict(
         repo="unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
@@ -180,6 +182,31 @@ MODELS = {
         size_gb=13.3, num_ctx=4096,
         label="Qwen3-Coder-30B-A3B (Q3_K_S)",
         tag="qwen3-coder-30b",
+        need_vram=13,
+    ),
+    "coder7b_ablit": dict(
+        repo="bartowski/Qwen2.5-Coder-7B-Instruct-abliterated-GGUF",
+        file="Qwen2.5-Coder-7B-Instruct-abliterated-Q4_K_M.gguf",
+        size_gb=4.7, num_ctx=4096,
+        label="Qwen2.5-Coder-7B abliterated (Q4_K_M)",
+        tag="qwen2.5-coder-7b-abliterated",
+        need_vram=8,
+    ),
+    "coder3b_ablit": dict(
+        repo="bartowski/Qwen2.5-Coder-3B-Instruct-abliterated-GGUF",
+        file="Qwen2.5-Coder-3B-Instruct-abliterated-Q4_K_M.gguf",
+        size_gb=1.9, num_ctx=4096,
+        label="Qwen2.5-Coder-3B abliterated (Q4_K_M — លឿនបំផុត)",
+        tag="qwen2.5-coder-3b-abliterated",
+        need_vram=0,
+    ),
+    "qwen38b": dict(
+        repo="unsloth/Qwen3-8B-GGUF",
+        file="Qwen3-8B-Q4_K_M.gguf",
+        size_gb=5.0, num_ctx=4096,
+        label="Qwen3-8B (Q4_K_M)",
+        tag="qwen3-8b",
+        need_vram=6,
     ),
     "qwen38_27b": dict(
         repo="unsloth/Qwen3.8-27B-GGUF",
@@ -208,11 +235,22 @@ if gpu:
     except Exception:
         gpu_gb = 0.0
 
-if gpu_gb < 15 and MODEL_CHOICE not in ("qwen38b", "coder7b", "coder7b_ablit"):
-    print(f"⚠️ GPU មានតែ {gpu_gb:.0f}GB (ឬគ្មាន) — ម៉ូដែល {MODELS[MODEL_CHOICE]['label']} "
-          "អាចលើស memory។ ប្តូរទៅ 'coder7b' បើចង់ឲ្យរត់រលូន (ស្រាល លឿន)។")
+# auto = រើស model ធំបំផុតដែល GPU នេះអាចទ្រាំទ្របាន
+#   A100 40GB / L4 24GB → 32B (~20GB) | T4 16GB → 30B-A3B (13GB, MoE លឿន) | 8GB → 7B | គ្មាន GPU → 3B
+if MODEL_CHOICE == "auto":
+    MODEL_CHOICE = "coder3b_ablit"
+    for key in ("coder32b", "coder30b", "qwen38b", "coder7b_ablit"):
+        if gpu_gb >= MODELS[key].get("need_vram", 99):
+            MODEL_CHOICE = key
+            break
+    print(f"🧩 GPU {gpu_gb:.0f}GB → រើស {MODELS[MODEL_CHOICE]['label']} "
+          "(ប្តូរជាមួយ dropdown MODEL_CHOICE បើចង់កំណត់ខ្លួនឯង)")
 
 cfg = MODELS[MODEL_CHOICE]
+if cfg.get("need_vram", 0) and gpu_gb and gpu_gb < cfg["need_vram"]:
+    print(f"⚠️ GPU មានតែ {gpu_gb:.0f}GB តែ {MODELS[MODEL_CHOICE]['label']} ត្រូវការ ~{cfg['need_vram']}GB "
+          "— អាចយឺត ឬ out-of-memory។ ប្តូរទៅ 'coder7b_ablit' បើជួបបញ្ហា។")
+
 print(f"📦 កំពុងទាញយក {cfg['label']} (~{cfg['size_gb']}GB) … សូមរង់ចាំ")
 
 from huggingface_hub import hf_hub_download

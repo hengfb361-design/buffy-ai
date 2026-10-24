@@ -77,11 +77,17 @@ Render គ្មាន GPU ដូច្នេះ website ត្រូវហៅ�
 
 | ជម្រើស | ទំហំ | កំណត់សម្គាល់ |
 |---|---|---|
-| `coder7b_ablit` (default) — Qwen2.5-Coder-7B-Instruct **abliterated** `Q4_K_M` | 4.7 GB | គ្មាន refusal ដែលរំខានពេលសរសេរកូដ; ស្រាល; រត់បានលើ T4 និង CPU |
-| `qwen38b` — Qwen3-8B `Q4_K_M` | 5.0 GB | សមល្មមសម្រាប់ T4 16GB; លឿន; ឆ្លើយបានល្អ |
-| `coder30b` — Qwen3-Coder-30B-A3B `Q3_K_S` | 13.3 GB | ល្អបំផុតសម្រាប់ code; MoE 3B active → លឿន; ត្រូវការ T4 16GB |
-| `qwen38_27b` — Qwen3.8-27B `UD-IQ3_S` | 12.0 GB | ជំនាន់ថ្មី; dense → យឺតជាង |
-| `coder7b` — Qwen2.5-Coder-7B `Q4_K_M` | 4.7 GB | ស្រាល/លឿន; រត់បានលើ CPU (យឺត) |
+| `auto` (**default**) | — | script រើស model ធំបំផុតដែល GPU ទ្រាំបាន |
+| `coder32b` | **19.9 GB** | Qwen2.5-Coder-32B `Q4_K_M` — «model 20GB», ឆ្លាតបំផុត; ត្រូវ A100 40GB / L4 24GB |
+| `coder30b` | 13.3 GB | Qwen3-Coder-30B-A3B `Q3_K_S` — MoE 3B active → **លឿន ហើយឆ្លាត**; សម្រាប់ T4 16GB |
+| `coder7b_ablit` | 4.7 GB | Qwen2.5-Coder-7B **abliterated** `Q4_K_M` — លឿន; គ្មានការបដិសេធរំខាន |
+| `coder3b_ablit` | 1.9 GB | Qwen2.5-Coder-3B **abliterated** `Q4_K_M` — លឿនបំផុត / គ្មាន GPU |
+| `qwen38b` | 5.0 GB | Qwen3-8B `Q4_K_M` |
+| `qwen38_27b` | 12.0 GB | Qwen3.8-27B `UD-IQ3_S` — dense 27B → យឺតជាង |
+| `coder7b` | 4.7 GB | Qwen2.5-Coder-7B `Q4_K_M` (មិន abliterated) |
+
+> បញ្ជាដោយខ្លួនឯង៖ `BUFFY_MODEL=coder32b bash /content/buffy-start.sh` ឬក្នុង notebook
+> ប្តូរ dropdown `MODEL_CHOICE`។ ចង់បាន model 20GB លើ Colab → `Runtime → Change runtime type → A100`។
 
 > ម៉ូដែល abliterated គឺយក refusal direction ចេញពី weights — វាមិនមែនជាការបន្ថែមសមត្ថភាពទេ
 > តែវាបន្ថយការបដិសេធដែលមិនចាំបាច់។ អ្នកនៅទទួលខុសត្រូវលើអ្វីដែលអ្នកសួរ និងផលដែលបានមក។
