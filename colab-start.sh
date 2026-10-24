@@ -47,11 +47,45 @@ trap cleanup INT TERM EXIT
 
 # ─── ១/៥ Ollama ────────────────────────────────────────────────────────────
 say "១/៥  ពិនិត្យ Ollama"
+
+# ដំឡើងតាម script ផ្លូវការ; បើបរាជ័យ (ឧ. ollama.com ត្រូវបានបិទ/យឺត) → ទាញ binary ពី GitHub ផ្ទាល់
+install_ollama() {
+  local log="$WORK/ollama-install.log"
+  local arch tgz
+  echo "   កំពុងដំឡើងតាម ollama.com …"
+  if curl -fsSL https://ollama.com/install.sh -o "$WORK/install.sh" 2>"$log" && sh "$WORK/install.sh" >>"$log" 2>&1; then
+    return 0
+  fi
+  echo "   ⚠️  ollama.com មិនជោគជ័យ — សាកទាញ binary ពី GitHub release …"
+  case "$(uname -m)" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) arch="" ;;
+  esac
+  [ -n "$arch" ] || return 1
+  tgz="$WORK/ollama-linux-$arch.tgz"
+  if curl -fL --retry 3 --progress-bar -o "$tgz" \
+      "https://github.com/ollama/ollama/releases/latest/download/ollama-linux-$arch.tgz" >>"$log" 2>&1; then
+    if tar -C /usr/local -xzf "$tgz" >>"$log" 2>&1; then
+      [ -x /usr/local/bin/ollama ] && \
+        ln -sf /usr/local/bin/ollama /usr/bin/ollama 2>/dev/null || true
+      rm -f "$tgz"
+      return 0
+    fi
+  fi
+  return 1
+}
+
 if ! command -v ollama >/dev/null 2>&1; then
-  echo "   កំពុងដំឡើង Ollama (១–២ នាទី) …"
-  curl -fsSL https://ollama.com/install.sh | sh >"$WORK/ollama-install.log" 2>&1 \
-    || die "ដំឡើង Ollama មិនបាន — សូមមើល $WORK/ollama-install.log"
+  if ! install_ollama || ! command -v ollama >/dev/null 2>&1; then
+    echo "   ── សារកំហុសចុងក្រោយ ──"
+    tail -n 15 "$WORK/ollama-install.log" 2>/dev/null || true
+    echo "   ─────────────────────────"
+    die "ដំឡើង Ollama មិនបាន — សូមផ្ញើបន្ទាត់ខាងលើមកខ្ញុំ ឬសាករត់ cell ម្តងទៀត"
+  fi
 fi
+# ករណី binary មានតែ /usr/local/bin ហើយ PATH មិនរួមបញ្ចូល
+command -v ollama >/dev/null 2>&1 || export PATH="/usr/local/bin:$PATH"
 if ! curl -sf "$OLLAMA_URL_LOCAL/api/tags" >/dev/null 2>&1; then
   echo "   កំពុងបើក ollama serve …"
   nohup ollama serve >"$WORK/ollama.log" 2>&1 </dev/null &
@@ -60,8 +94,12 @@ if ! curl -sf "$OLLAMA_URL_LOCAL/api/tags" >/dev/null 2>&1; then
     sleep 1
   done
 fi
-curl -sf "$OLLAMA_URL_LOCAL/api/tags" >/dev/null 2>&1 \
-  || die "Ollama មិនឡើង — សូមមើល $WORK/ollama.log"
+if ! curl -sf "$OLLAMA_URL_LOCAL/api/tags" >/dev/null 2>&1; then
+  echo "   ── សារកំហុសពី ollama.log ──"
+  tail -n 10 "$WORK/ollama.log" 2>/dev/null || true
+  echo "   ─────────────────────────"
+  die "Ollama មិនឡើង — សូមផ្ញើបន្ទាត់ខាងលើមកខ្ញុំ"
+fi
 ok "Ollama ដំណើរការ"
 
 # ─── ២/៥ ទាញយកម៉ូដែល ──────────────────────────────────────────────────────
