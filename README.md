@@ -82,6 +82,26 @@ Website/`local_app.py` អាចប្រើ backend ពីរ — **key អា�
 > ⛔ កុំដាក់ key ក្នុងកូដ, `.env` ដែល commit, URL ឬ input box ក្នុង browser។
 > បើ key ធ្លាយ (ឧ. paste ក្នុង chat) → revoke/regenerate ភ្លាម។
 
+## Deploy ទៅ Render (website អចិន្ត្រៃយ៍)
+
+Repo នេះ deploy ទៅ [Render](https://dashboard.render.com) បានដោយគ្មាន Docker — ត្រូវការតែ ៣ ក្រណាត់នៅ **New → Web Service** (ជ្រើស repo នេះ)៖
+
+| Field | តម្លៃ |
+|---|---|
+| Runtime | `Python 3` |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `uvicorn local_app:app --host 0.0.0.0 --port $PORT` |
+
+> `requirements.txt` ត្រូវបាន commit ក្នុង repo (fastapi, uvicorn, requests) — ដោយសារតែ repo អត់មានវា
+> Render error `Module "local_app" not found` / `No module named …`
+
+Env vars នៅ **Environment** tab របស់ service (មិនចាំបាច់សម្រាប់ local Colab mode ទេ)៖
+
+- `API_BASE_URL` + `API_KEY` + `API_MODEL` → ឆ្លើយពី API ពិត (គ្មាន GPU លើ Render ទេ)
+- `EXA_API_KEY` → web search បង្ហាញប្រភព
+
+> Render ឥតគិតថ្លៃ **sleep បន្ទាប់ពី ១៥ នាទី idle** — ការសួរដំបូងប្រហែល ៥០វិនាទី យឺត រួចប្រក្នុងល្បឿនធម្មតា។
+
 ## Push ទៅ GitHub
 
 ```bash
