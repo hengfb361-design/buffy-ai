@@ -32,7 +32,8 @@ Repo៖ https://github.com/hengfb361-design/buffy-ai
 
 | ជម្រើស | ទំហំ | កំណត់សម្គាល់ |
 |---|---|---|
-| `coder30b` (default) — Qwen3-Coder-30B-A3B `Q3_K_S` | 13.3 GB | ល្អបំផុតសម្រាប់ code; MoE 3B active → លឿន; ត្រូវការ T4 16GB |
+| `qwen38b` (default) — Qwen3-8B `Q4_K_M` | 5.0 GB | សមល្មមសម្រាប់ T4 16GB; លឿន; ឆ្លើយបានល្អ |
+| `coder30b` — Qwen3-Coder-30B-A3B `Q3_K_S` | 13.3 GB | ល្អបំផុតសម្រាប់ code; MoE 3B active → លឿន; ត្រូវការ T4 16GB |
 | `qwen38_27b` — Qwen3.8-27B `UD-IQ3_S` | 12.0 GB | ជំនាន់ថ្មី; dense → យឺតជាង |
 | `coder7b` — Qwen2.5-Coder-7B `Q4_K_M` | 4.7 GB | ស្រាល/លឿន; រត់បានលើ CPU (យឺត) |
 

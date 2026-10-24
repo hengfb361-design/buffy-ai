@@ -80,7 +80,7 @@ Notebook នេះទាញយក **GGUF** ពី Hugging Face រួចរត�
 ---
 
 ## ⚠️ អានមុនគេ
-1. **ត្រូវការ GPU**៖ `Runtime → Change runtime type → T4 GPU` (បើគ្មាន GPU វានឹងប្តូរទៅម៉ូដែល 7B លើ CPU ដែលយឺតខ្លាំង)
+1. **ត្រូវការ GPU**៖ `Runtime → Change runtime type → T4 GPU` (Qwen3-8B ដែលជា default សមល្មមសម្រាប់ T4 16GB)
 2. **ទំហំ**៖ ម៉ូដែល 13GB ត្រូវការ disk ~30GB (ទាញយក + import) — Colab មាន ~100GB គ្រប់គ្រាន់
 3. **ពេលវេលា**៖ ទាញយក ~3–10 នាទី; ចម្លើយដំបូងយឺត (~1 នាទី) ព្រោះត្រូវ load ចូល GPU
 
@@ -88,7 +88,8 @@ Notebook នេះទាញយក **GGUF** ពី Hugging Face រួចរត�
 
 | ជម្រើស | ទំហំ | លក្ខណៈ |
 |---|---|---|
-| `coder30b` (default) | 13.3 GB | Qwen3-Coder-30B-A3B — ល្អបំផុតសម្រាប់ code, MoE 3B active → លឿន |
+| `qwen38b` (default) | 5.0 GB | Qwen3-8B Q4_K_M — ល្អណាស់សម្រាប់ T4, ឆាប់រៀន, សន្សំសំចៃ VRAM |
+| `coder30b` | 13.3 GB | Qwen3-Coder-30B-A3B — ល្អបំផុតសម្រាប់ code, MoE 3B active → លឿន |
 | `qwen38_27b` | 12.0 GB | Qwen3.8-27B — ជំនាន់ថ្មី, យឺតជាង (dense 27B) |
 | `coder7b` | 4.7 GB | Qwen2.5-Coder-7B — ស្រាល, លឿន, ប្រើបានលើ CPU |
 
@@ -141,11 +142,17 @@ print(gpu or "⚠️ គ្មាន GPU — សូមបើក Runtime → Chan
 
 MODEL_CELL = '''#@title 2️⃣ ទាញយកម៉ូដែល + import ចូល Ollama
 #@markdown ជ្រើសម៉ូដែល (សូមមើលតារាងខាងលើ):
-MODEL_CHOICE = "coder30b"  #@param ["coder30b", "qwen38_27b", "coder7b"]
+MODEL_CHOICE = "qwen38b"  #@param ["qwen38b", "coder30b", "qwen38_27b", "coder7b"]
 
 import os, subprocess, time, urllib.request
 
 MODELS = {
+    "qwen38b": dict(
+        repo="unsloth/Qwen3-8B-GGUF",
+        file="Qwen3-8B-Q4_K_M.gguf",
+        size_gb=5.0, num_ctx=8192,
+        label="Qwen3-8B (Q4_K_M)",
+    ),
     "coder30b": dict(
         repo="unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
         file="Qwen3-Coder-30B-A3B-Instruct-Q3_K_S.gguf",
@@ -177,7 +184,7 @@ if gpu:
     except Exception:
         gpu_gb = 0.0
 
-if gpu_gb < 15 and MODEL_CHOICE != "coder7b":
+if gpu_gb < 15 and MODEL_CHOICE not in ("qwen38b", "coder7b"):
     print(f"⚠️ GPU មានតែ {gpu_gb:.0f}GB (ឬគ្មាន) — ម៉ូដែល {MODELS[MODEL_CHOICE]['label']} "
           "អាចលើស memory។ ប្តូរទៅ 'coder7b' បើចង់ឲ្យរត់រលូន (ស្រាល លឿន)។")
 
@@ -212,6 +219,16 @@ import os, re, subprocess, sys, time, urllib.request
 PORT = 8000
 os.environ["LLAMA_URL"] = "http://127.0.0.1:11434"
 os.environ["LOCAL_MODEL"] = "buffy-coder"
+
+# Web search (Exa) — បើអ្នកដាក់ EXA_API_KEY ក្នុង Colab 🔑 Secrets វានឹងបើក search
+try:
+    from google.colab import userdata
+    _k = userdata.get("EXA_API_KEY")
+    if _k:
+        os.environ["EXA_API_KEY"] = _k
+        print("✅ EXA_API_KEY បានផ្ទុកពី Colab Secrets — web search បើក")
+except Exception:
+    pass  # គ្មាន key = search បិទ, app នៅតែរត់ធម្មតា
 
 # កំដៅម៉ូដែល (load ចូល GPU មុន) ដើម្បីឲ្យសារដំបូងក្នុង UI លឿន
 print("🔥 កំពុង load ម៉ូដែលចូល GPU … (អាចយូរ ~1 នាទី)")
